@@ -1,0 +1,200 @@
+{
+  "database": "agricola",
+  "version": 2,
+  "encrypted": false,
+  "mode": "full",
+  "tables": [
+    {
+      "name": "parcelas",
+      "schema": [
+        { "column": "id",          "value": "TEXT PRIMARY KEY" },
+        { "column": "nombre",      "value": "TEXT NOT NULL" },
+        { "column": "ubicacion",   "value": "TEXT" },
+        { "column": "area",        "value": "NUMERIC" },
+        { "column": "cultivo",     "value": "TEXT" },
+        { "column": "descripcion", "value": "TEXT" },
+        { "column": "created_at",  "value": "TEXT" },
+        { "column": "updated_at",  "value": "TEXT" },
+        { "column": "deleted_at",  "value": "TEXT" },
+        { "column": "is_synced",   "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",   "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "parcela_users",
+      "schema": [
+        { "column": "id",         "value": "TEXT PRIMARY KEY" },
+        { "column": "parcela_id", "value": "TEXT NOT NULL" },
+        { "column": "user_id",    "value": "TEXT NOT NULL" },
+        { "column": "rol",        "value": "TEXT NOT NULL DEFAULT 'productor'" },
+        { "column": "created_at", "value": "TEXT" },
+        { "column": "updated_at", "value": "TEXT" },
+        { "column": "deleted_at", "value": "TEXT" },
+        { "column": "is_synced",  "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",  "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "obreros",
+      "schema": [
+        { "column": "id",         "value": "TEXT PRIMARY KEY" },
+        { "column": "nombre",     "value": "TEXT NOT NULL" },
+        { "column": "dni",        "value": "TEXT" },
+        { "column": "cargo",      "value": "TEXT" },
+        { "column": "telefono",   "value": "TEXT" },
+        { "column": "direccion",  "value": "TEXT" },
+        { "column": "salario",    "value": "NUMERIC" },
+        { "column": "foto",       "value": "TEXT" },
+        { "column": "created_at", "value": "TEXT" },
+        { "column": "updated_at", "value": "TEXT" },
+        { "column": "deleted_at", "value": "TEXT" },
+        { "column": "is_synced",  "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",  "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "tareas",
+      "schema": [
+        { "column": "id",               "value": "TEXT PRIMARY KEY" },
+        { "column": "parcela_id",       "value": "TEXT" },
+        { "column": "tipo_tarea",       "value": "TEXT NOT NULL" },
+        { "column": "descripcion",      "value": "TEXT" },
+        { "column": "estado",           "value": "TEXT NOT NULL DEFAULT 'programada'" },
+        { "column": "fecha_programada", "value": "TEXT" },
+        { "column": "fecha_inicio",     "value": "TEXT" },
+        { "column": "fecha_fin",        "value": "TEXT" },
+        { "column": "costo_total",      "value": "NUMERIC DEFAULT 0" },
+        { "column": "observaciones",    "value": "TEXT" },
+        { "column": "created_at",       "value": "TEXT" },
+        { "column": "updated_at",       "value": "TEXT" },
+        { "column": "deleted_at",       "value": "TEXT" },
+        { "column": "is_synced",        "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",        "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "costo_obreros",
+      "schema": [
+        { "column": "id",               "value": "TEXT PRIMARY KEY" },
+        { "column": "tarea_id",         "value": "TEXT NOT NULL" },
+        { "column": "tipo_trabajo",     "value": "TEXT" },
+        { "column": "num_obreros",      "value": "INTEGER DEFAULT 1" },
+        { "column": "dias",             "value": "NUMERIC DEFAULT 1" },
+        { "column": "costo_por_obrero", "value": "NUMERIC DEFAULT 0" },
+        { "column": "subtotal",         "value": "NUMERIC DEFAULT 0" },
+        { "column": "observaciones",    "value": "TEXT" },
+        { "column": "created_at",       "value": "TEXT" },
+        { "column": "updated_at",       "value": "TEXT" },
+        { "column": "deleted_at",       "value": "TEXT" },
+        { "column": "is_synced",        "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",        "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "costo_herramientas",
+      "schema": [
+        { "column": "id",             "value": "TEXT PRIMARY KEY" },
+        { "column": "tarea_id",       "value": "TEXT NOT NULL" },
+        { "column": "nombre",         "value": "TEXT NOT NULL" },
+        { "column": "modalidad",      "value": "TEXT DEFAULT 'alquilado'" },
+        { "column": "cantidad",       "value": "NUMERIC DEFAULT 1" },
+        { "column": "costo_unitario", "value": "NUMERIC DEFAULT 0" },
+        { "column": "subtotal",       "value": "NUMERIC DEFAULT 0" },
+        { "column": "descripcion",    "value": "TEXT" },
+        { "column": "created_at",     "value": "TEXT" },
+        { "column": "updated_at",     "value": "TEXT" },
+        { "column": "deleted_at",     "value": "TEXT" },
+        { "column": "is_synced",      "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",      "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "costo_insumos",
+      "schema": [
+        { "column": "id",             "value": "TEXT PRIMARY KEY" },
+        { "column": "tarea_id",       "value": "TEXT NOT NULL" },
+        { "column": "tipo_insumo",    "value": "TEXT DEFAULT 'otro'" },
+        { "column": "nombre",         "value": "TEXT NOT NULL" },
+        { "column": "cantidad",       "value": "NUMERIC DEFAULT 1" },
+        { "column": "costo_unitario", "value": "NUMERIC DEFAULT 0" },
+        { "column": "subtotal",       "value": "NUMERIC DEFAULT 0" },
+        { "column": "descripcion",    "value": "TEXT" },
+        { "column": "created_at",     "value": "TEXT" },
+        { "column": "updated_at",     "value": "TEXT" },
+        { "column": "deleted_at",     "value": "TEXT" },
+        { "column": "is_synced",      "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",      "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "cosechas",
+      "schema": [
+        { "column": "id",                   "value": "TEXT PRIMARY KEY" },
+        { "column": "parcela_id",           "value": "TEXT" },
+        { "column": "tarea_id",             "value": "TEXT" },
+        { "column": "fecha_cosecha",        "value": "TEXT NOT NULL" },
+        { "column": "cant_baldes",          "value": "NUMERIC DEFAULT 0" },
+        { "column": "pctj_merma",           "value": "NUMERIC DEFAULT 60" },
+        { "column": "kg_bruto",             "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_seco",              "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_bruto_disponible",  "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_seco_disponible",   "value": "NUMERIC DEFAULT 0" },
+        { "column": "estado",               "value": "TEXT NOT NULL DEFAULT 'COSECHADO'" },
+        { "column": "observaciones",        "value": "TEXT" },
+        { "column": "created_at",           "value": "TEXT" },
+        { "column": "updated_at",           "value": "TEXT" },
+        { "column": "deleted_at",           "value": "TEXT" },
+        { "column": "is_synced",            "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",            "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "ventas",
+      "schema": [
+        { "column": "id",                    "value": "TEXT PRIMARY KEY" },
+        { "column": "nr_venta",              "value": "TEXT" },
+        { "column": "fecha_venta",           "value": "TEXT NOT NULL" },
+        { "column": "usuario_id",            "value": "TEXT" },
+        { "column": "comprador",             "value": "TEXT" },
+        { "column": "vendedor",              "value": "TEXT" },
+        { "column": "lugar_venta",           "value": "TEXT" },
+        { "column": "estado_humedad",        "value": "TEXT NOT NULL DEFAULT 'SECO'" },
+        { "column": "kg_bruto_aproximados",  "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_seco_aproximados",   "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_bruto",              "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_seco",               "value": "NUMERIC DEFAULT 0" },
+        { "column": "desc_humedad",          "value": "NUMERIC DEFAULT 0" },
+        { "column": "cantidad_vendida_kg",   "value": "NUMERIC DEFAULT 0" },
+        { "column": "precio_kg",             "value": "NUMERIC DEFAULT 0" },
+        { "column": "total_venta",           "value": "NUMERIC DEFAULT 0" },
+        { "column": "observaciones",         "value": "TEXT" },
+        { "column": "created_at",            "value": "TEXT" },
+        { "column": "updated_at",            "value": "TEXT" },
+        { "column": "deleted_at",            "value": "TEXT" },
+        { "column": "is_synced",             "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",             "value": "TEXT" }
+      ]
+    },
+    {
+      "name": "venta_cosecha_detalle",
+      "schema": [
+        { "column": "id",                     "value": "TEXT PRIMARY KEY" },
+        { "column": "venta_id",               "value": "TEXT NOT NULL" },
+        { "column": "cosecha_id",             "value": "TEXT NOT NULL" },
+        { "column": "parcela_id",             "value": "TEXT" },
+        { "column": "kg_bruto",               "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_seco",                "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_bruto_disponible",    "value": "NUMERIC DEFAULT 0" },
+        { "column": "kg_seco_disponible",     "value": "NUMERIC DEFAULT 0" },
+        { "column": "porcentaje_total_venta", "value": "NUMERIC DEFAULT 0" },
+        { "column": "cantidad_vendida_kg",    "value": "NUMERIC DEFAULT 0" },
+        { "column": "subtotal",               "value": "NUMERIC DEFAULT 0" },
+        { "column": "created_at",             "value": "TEXT" },
+        { "column": "updated_at",             "value": "TEXT" },
+        { "column": "deleted_at",             "value": "TEXT" },
+        { "column": "is_synced",              "value": "INTEGER DEFAULT 0" },
+        { "column": "synced_at",              "value": "TEXT" }
+      ]
+    }
+  ]
+}
