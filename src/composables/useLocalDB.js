@@ -25,7 +25,7 @@ export function useLocalDB() {
     const marks = cols.map(() => '?').join(', ')
     const stmt  = `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${marks})`
 
-    await db().execute(stmt, vals)
+    await db().run(stmt, vals)
     await saveWebStore()
     return { id: data.id }
   }
@@ -55,14 +55,14 @@ export function useLocalDB() {
 
     const sets = Object.keys(changes).map(k => `${k} = ?`).join(', ')
     const vals = [...Object.values(changes), id]
-    await db().execute(`UPDATE ${table} SET ${sets} WHERE id = ?`, vals)
+    await db().run(`UPDATE ${table} SET ${sets} WHERE id = ?`, vals)
     await saveWebStore()
     return { changes: 1 }
   }
 
   async function remove(table, id) {
     const now = new Date().toISOString()
-    await db().execute(
+    await db().run(
       `UPDATE ${table} SET deleted_at = ?, updated_at = ?, is_synced = 0, synced_at = NULL WHERE id = ?`,
       [now, now, id]
     )
@@ -93,7 +93,7 @@ export function useLocalDB() {
   // Marca un registro como sincronizado
   async function markSynced(table, id) {
     const now = new Date().toISOString()
-    await db().execute(
+    await db().run(
       `UPDATE ${table} SET is_synced = 1, synced_at = ? WHERE id = ?`,
       [now, id]
     )
@@ -108,12 +108,22 @@ export function useLocalDB() {
     const cols  = Object.keys(row)
     const vals  = Object.values(row)
     const marks = cols.map(() => '?').join(', ')
-    await db().execute(
+    await db().run(
       `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${marks})`,
       vals
     )
     await saveWebStore()
   }
 
-  return { create, readAll, getById, update, remove, query, getUnsynced, markSynced, upsertFromRemote }
+  async function queryIn(table, field, values) {
+    if (!values.length) return []
+    const marks = values.map(() => '?').join(', ')
+    const res = await db().query(
+      `SELECT * FROM ${table} WHERE deleted_at IS NULL AND ${field} IN (${marks})`,
+      values
+    )
+    return res.values || []
+  }
+
+  return { create, readAll, getById, update, remove, query, queryIn, getUnsynced, markSynced, upsertFromRemote }
 }

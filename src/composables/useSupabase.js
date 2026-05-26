@@ -23,9 +23,6 @@ export function useSupabase() {
   }
 
   async function readAll(table, orderBy = 'created_at', ascending = false) {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) console.warn(`[Supabase] readAll(${table}) — SIN SESIÓN, RLS bloqueará`)
-
     const { data, error } = await supabase
       .from(table)
       .select('*')
@@ -33,11 +30,10 @@ export function useSupabase() {
       .order(orderBy, { ascending })
 
     if (error) {
-      console.error(`[Supabase] readAll(${table}):`, error.message, error.code)
+      console.error(`[Supabase] readAll(${table}):`, error.message)
       throw new Error(error.message)
     }
 
-    console.log(`[Supabase] readAll(${table}) => ${data?.length || 0} registros`)
     return data || []
   }
 
@@ -101,5 +97,16 @@ export function useSupabase() {
     return data || []
   }
 
-  return { create, readAll, getById, update, remove, query }
+  async function queryIn(table, field, values) {
+    if (!values.length) return []
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .in(field, values)
+      .is('deleted_at', null)
+    if (error) throw new Error(error.message)
+    return data || []
+  }
+
+  return { create, readAll, getById, update, remove, query, queryIn }
 }

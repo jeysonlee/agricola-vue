@@ -12,24 +12,22 @@
 
       <ion-refresher slot="fixed" @ionRefresh="onRefresh"><ion-refresher-content /></ion-refresher>
       <ion-list v-if="!loading && filtered.length">
-        <ion-item-sliding v-for="item in filtered" :key="item.id">
-          <ion-item button @click="openForm(item)">
-            <ion-avatar slot="start">
-              <div class="avatar-placeholder">{{ initials(item) }}</div>
-            </ion-avatar>
-            <ion-label>
-              <h2>{{ userDisplayName(item) || item.email }}</h2>
-              <p>{{ item.email }}</p>
-              <p>Rol: {{ item.role || 'user' }}</p>
-            </ion-label>
-            <ion-badge :color="item.role === 'admin' ? 'danger' : 'primary'" slot="end">{{ item.role || 'user' }}</ion-badge>
-          </ion-item>
-          <ion-item-options side="end">
-            <ion-item-option color="danger" @click="confirmarEliminar(item)" :disabled="item.id === auth.currentUser?.id">
+        <ion-item v-for="item in filtered" :key="item.id" button @click="openForm(item)">
+          <ion-avatar slot="start">
+            <div class="avatar-placeholder">{{ initials(item) }}</div>
+          </ion-avatar>
+          <ion-label>
+            <h2>{{ userDisplayName(item) || item.email }}</h2>
+            <p>{{ item.email }}</p>
+            <p>Rol: {{ item.role || 'user' }} · {{ item.status || 'activo' }}</p>
+          </ion-label>
+          <div slot="end" class="user-actions" @click.stop>
+            <ion-badge :color="roleColor(item.role)" style="margin-right:4px">{{ item.role || 'user' }}</ion-badge>
+            <ion-button fill="clear" size="small" color="danger" @click="confirmarEliminar(item)" :disabled="item.id === auth.currentUser?.id" title="Eliminar usuario">
               <ion-icon slot="icon-only" :icon="trashOutline" />
-            </ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
+            </ion-button>
+          </div>
+        </ion-item>
       </ion-list>
       <div v-else-if="!loading && !filtered.length" class="empty-state">
         <ion-icon :icon="personOutline" />
@@ -50,7 +48,7 @@ import { onIonViewWillEnter } from '@ionic/vue'
 import AppHeader from '../../components/AppHeader.vue'
 import {
   IonPage, IonToolbar, IonButton, IonIcon,
-  IonContent, IonList, IonItem, IonItemSliding, IonItemOptions, IonItemOption,
+  IonContent, IonList, IonItem,
   IonLabel, IonSearchbar, IonRefresher, IonRefresherContent, IonLoading,
   IonModal, IonAvatar, IonBadge, alertController, toastController,
 } from '@ionic/vue'
@@ -93,6 +91,13 @@ async function loadData() {
 }
 function openForm(item) { selected.value = item; formOpen.value = true }
 async function onSaved() { formOpen.value = false; await loadData(); showToast('Usuario guardado', 'success') }
+function roleColor(role) {
+  const r = role?.toLowerCase()
+  if (r === 'superadmin') return 'danger'
+  if (r === 'admin')      return 'warning'
+  if (r === 'tecnico')    return 'tertiary'
+  return 'primary'
+}
 async function confirmarEliminar(item) {
   const alert = await alertController.create({
     header: 'Eliminar', message: `¿Eliminar usuario "${userDisplayName(item) || item.email}"?`,
@@ -111,4 +116,6 @@ onMounted(loadData)
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; color: var(--ion-color-medium); gap: 12px; }
 .empty-state ion-icon { font-size: 64px; }
 .avatar-placeholder { width: 100%; height: 100%; background: var(--ion-color-primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1rem; border-radius: 50%; }
+.user-actions { display: flex; align-items: center; gap: 0; }
+.user-actions ion-button { --padding-start: 4px; --padding-end: 4px; }
 </style>

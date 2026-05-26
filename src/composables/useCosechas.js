@@ -13,8 +13,20 @@ export function useCosechas() {
   const porParcela = (parcela_id) => query(TABLE, '*', { parcela_id }, { column: 'fecha_cosecha', ascending: false })
   const porTarea = (tarea_id) => query(TABLE, '*', { tarea_id })
 
+  async function getAllByParcelas(ids) {
+    const all = await getAll()
+    if (ids === null) return all
+    if (!ids.length) return []
+    return all.filter(c => ids.includes(c.parcela_id))
+  }
+
   async function disponibles() {
     const all = await getAll()
+    return all.filter(c => (+(c.kg_bruto_disponible ?? 0)) > 0 || (+(c.kg_seco_disponible ?? 0)) > 0)
+  }
+
+  async function disponiblesByParcelas(ids) {
+    const all = await getAllByParcelas(ids)
     return all.filter(c => (+(c.kg_bruto_disponible ?? 0)) > 0 || (+(c.kg_seco_disponible ?? 0)) > 0)
   }
 
@@ -29,11 +41,11 @@ export function useCosechas() {
     return 'COSECHADO'
   }
 
-  async function actualizarDisponibles(cosechaId, kgBrutoVendido, kgSecoVendido) {
+  async function actualizarDisponibles(cosechaId, kgBrutoVendido, kgSecoVendido, forceZero = false) {
     const cosecha = await getOne(cosechaId)
     if (!cosecha) throw new Error('Cosecha no encontrada')
-    const nuevoBrutoDisp = Math.max(0, (+(cosecha.kg_bruto_disponible ?? cosecha.kg_bruto ?? 0)) - (+kgBrutoVendido))
-    const nuevoSecoDisp  = Math.max(0, (+(cosecha.kg_seco_disponible  ?? cosecha.kg_seco  ?? 0)) - (+kgSecoVendido))
+    const nuevoBrutoDisp = forceZero ? 0 : Math.max(0, (+(cosecha.kg_bruto_disponible ?? cosecha.kg_bruto ?? 0)) - (+kgBrutoVendido))
+    const nuevoSecoDisp  = forceZero ? 0 : Math.max(0, (+(cosecha.kg_seco_disponible  ?? cosecha.kg_seco  ?? 0)) - (+kgSecoVendido))
     const nuevoEstado    = calcularEstado({ ...cosecha, kg_bruto_disponible: nuevoBrutoDisp, kg_seco_disponible: nuevoSecoDisp })
     return editar(cosechaId, {
       kg_bruto_disponible: nuevoBrutoDisp,
@@ -55,5 +67,5 @@ export function useCosechas() {
     })
   }
 
-  return { getAll, getOne, crear, editar, eliminar, porParcela, porTarea, disponibles, calcularEstado, actualizarDisponibles, revertirDisponibles }
+  return { getAll, getOne, crear, editar, eliminar, porParcela, porTarea, getAllByParcelas, disponibles, disponiblesByParcelas, calcularEstado, actualizarDisponibles, revertirDisponibles }
 }

@@ -16,7 +16,7 @@
         <template v-else>{{ title }}</template>
       </ion-title>
 
-      <!-- Derecha: sync + avatar -->
+      <!-- Derecha: sync + notificaciones + avatar -->
       <ion-buttons slot="end">
         <slot v-if="showBack" name="end" />
         <ion-button v-if="isNative" fill="clear" @click="handleSync" :disabled="sync.syncing" class="sync-btn" title="Sincronizar">
@@ -24,6 +24,12 @@
           <ion-spinner v-else name="crescent" color="light" style="width:18px;height:18px" />
           <ion-badge v-if="sync.pendingCount > 0 && !sync.syncing" color="warning" class="sync-badge">
             {{ sync.pendingCount > 99 ? '99+' : sync.pendingCount }}
+          </ion-badge>
+        </ion-button>
+        <ion-button fill="clear" class="bell-btn" @click="notifOpen = true" title="Notificaciones">
+          <ion-icon :icon="notificationsOutline" color="light" />
+          <ion-badge v-if="notifStore.unreadCount > 0" color="danger" class="notif-badge">
+            {{ notifStore.unreadCount > 9 ? '9+' : notifStore.unreadCount }}
           </ion-badge>
         </ion-button>
         <ion-button fill="clear" class="avatar-btn" @click="openPopover">
@@ -46,6 +52,60 @@
     <slot name="below" />
   </ion-header>
 
+  <!-- ── Panel de notificaciones ── -->
+  <Teleport to="body">
+    <ion-modal
+      :is-open="notifOpen"
+      @didDismiss="notifOpen = false"
+      :breakpoints="[0, 0.7, 0.95]"
+      :initial-breakpoint="0.7"
+    >
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>
+            Notificaciones
+            <ion-badge v-if="notifStore.unreadCount > 0" color="danger" style="margin-left:6px;font-size:0.7rem">
+              {{ notifStore.unreadCount }}
+            </ion-badge>
+          </ion-title>
+          <ion-buttons slot="end">
+            <ion-button v-if="notifStore.noLeidas.length" fill="clear" size="small" @click="notifStore.marcarTodasLeidas()">
+              Leer todo
+            </ion-button>
+            <ion-button fill="clear" @click="notifOpen = false">
+              <ion-icon :icon="closeOutline" />
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content>
+        <ion-list v-if="notifStore.lista.length" lines="full">
+          <ion-item
+            v-for="n in notifStore.lista"
+            :key="n.id"
+            button
+            :class="{ 'notif-leida': !notifStore.noLeidas.find(x => x.id === n.id) }"
+            @click="abrirNotif(n)"
+          >
+            <div slot="start" class="notif-dot" :class="`dot-${n.color}`" />
+            <ion-label>
+              <h3 class="notif-titulo">{{ n.titulo }}</h3>
+              <p v-if="n.parcela">{{ n.parcela }}</p>
+              <p v-if="n.fecha">{{ formatNotifDate(n.fecha) }}</p>
+            </ion-label>
+            <ion-badge :color="n.color" slot="end" class="notif-label-badge">
+              {{ n.label }}
+            </ion-badge>
+          </ion-item>
+        </ion-list>
+        <div v-else class="notif-empty">
+          <ion-icon :icon="checkmarkCircleOutline" color="success" />
+          <p>Sin notificaciones pendientes</p>
+        </div>
+      </ion-content>
+    </ion-modal>
+  </Teleport>
+
   <Teleport to="body">
     <ion-popover
       :is-open="popoverOpen"
@@ -57,13 +117,13 @@
         <div class="popover-user-header">
           <div class="popover-avatar">{{ initials }}</div>
           <div class="popover-user-info">
-            <strong>{{ auth.currentUser?.name || auth.currentUser?.email?.split('@')[0] }}</strong>
+            <strong>{{ auth.displayName || auth.currentUser?.email }}</strong>
             <small>{{ auth.currentUser?.email }}</small>
             <span class="popover-role">{{ auth.currentUser?.role || 'usuario' }}</span>
           </div>
         </div>
         <ion-list lines="none" class="popover-list">
-          <ion-item button lines="none" @click="popoverOpen = false">
+          <ion-item button lines="none" @click="irAlPerfil">
             <ion-icon :icon="personCircleOutline" slot="start" color="primary" />
             <ion-label>Mi Perfil</ion-label>
           </ion-item>
@@ -83,13 +143,17 @@ import { useRouter } from 'vue-router'
 import {
   IonHeader, IonToolbar, IonTitle, IonButtons,
   IonMenuButton, IonBackButton, IonButton, IonIcon, IonBadge, IonSpinner,
-  IonPopover, IonContent, IonList, IonItem, IonLabel,
+  IonPopover, IonModal, IonContent, IonList, IonItem, IonLabel,
   alertController, toastController,
 } from '@ionic/vue'
-import { leafOutline, personCircleOutline, logOutOutline, cloudUploadOutline } from 'ionicons/icons'
-import { useAuthStore } from '../stores/auth'
-import { useSyncStore } from '../stores/sync'
-import { useSync } from '../composables/useSync'
+import {
+  leafOutline, personCircleOutline, logOutOutline, cloudUploadOutline,
+  notificationsOutline, closeOutline, checkmarkCircleOutline,
+} from 'ionicons/icons'
+import { useAuthStore }           from '../stores/auth'
+import { useSyncStore }           from '../stores/sync'
+import { useSync }                from '../composables/useSync'
+import { useNotificacionesStore } from '../stores/notificaciones'
 
 defineProps({
   title:    { type: String, default: '' },
@@ -99,32 +163,55 @@ defineProps({
 
 const isNative = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
 
-const auth   = useAuthStore()
-const router = useRouter()
-const sync   = useSyncStore()
+const auth       = useAuthStore()
+const router     = useRouter()
+const sync       = useSyncStore()
+const notifStore = useNotificacionesStore()
 const { syncAll, countPending } = useSync()
 
-// Cargar pendientes al montar
 countPending().catch(() => {})
 
 async function handleSync() {
   const result = await syncAll()
+  if (!result) return
+  const message = result.ok
+    ? 'Sincronización completada'
+    : (result.reason || 'Error al sincronizar')
   const t = await toastController.create({
-    message: result.ok ? 'Sincronización completada' : 'Sin conexión a internet',
-    duration: 2000,
+    message,
+    duration: 3000,
     color:    result.ok ? 'success' : 'warning',
     position: 'top',
   })
   t.present()
 }
 
+// ── Notificaciones ──
+const notifOpen = ref(false)
+
+function formatNotifDate(d) {
+  if (!d) return ''
+  return new Date(d + 'T12:00:00').toLocaleDateString('es-PE', { day: 'numeric', month: 'short' })
+}
+
+function abrirNotif(n) {
+  notifStore.marcarLeida(n.id)
+  notifOpen.value = false
+  router.push('/tabs/tareas')
+}
+
 const popoverOpen  = ref(false)
 const popoverEvent = ref(null)
 
 const initials = computed(() => {
-  const str = auth.currentUser?.name || auth.currentUser?.email || '?'
+  const str = auth.displayName || auth.currentUser?.email || '?'
   return str.split(/[\s@]/).map(s => s[0]).join('').toUpperCase().substring(0, 2)
 })
+
+function irAlPerfil() {
+  popoverOpen.value = false
+  router.push('/tabs/perfil')
+}
 
 function openPopover(e) {
   popoverEvent.value = e
@@ -256,4 +343,30 @@ async function handleLogout() {
 .popover-user-info small  { font-size: 0.75rem; color: var(--ion-color-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .popover-role { font-size: 0.7rem; color: var(--ion-color-primary); font-weight: 600; text-transform: capitalize; margin-top: 2px; }
 .popover-list { padding: 6px 0; }
+
+/* ── Bell button ── */
+.bell-btn { --padding-start: 4px; --padding-end: 4px; position: relative; }
+.notif-badge { position: absolute; top: 4px; right: 2px; font-size: 0.55rem; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; }
+
+/* ── Notification panel ── */
+.notif-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  margin-right: 4px;
+}
+.dot-danger  { background: var(--ion-color-danger); }
+.dot-warning { background: var(--ion-color-warning); }
+.dot-medium  { background: var(--ion-color-medium); }
+
+.notif-titulo { font-weight: 600; font-size: 0.9rem; }
+.notif-label-badge { font-size: 0.65rem; padding: 3px 7px; }
+
+.notif-leida { opacity: 0.5; }
+
+.notif-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 30vh;
+  gap: 10px; color: var(--ion-color-medium);
+}
+.notif-empty ion-icon { font-size: 52px; }
+.notif-empty p { font-size: 0.9rem; margin: 0; }
 </style>

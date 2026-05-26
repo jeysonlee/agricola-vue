@@ -103,14 +103,17 @@ export const useAuthStore = defineStore('auth', () => {
     if (data.session) {
       session.value = data.session
       if (!currentUser.value) {
-        const user = await fetchOrCreateProfile(data.session.user)
-        currentUser.value = user
-        localStorage.setItem('currentUser', JSON.stringify(user))
+        try {
+          const user = await fetchOrCreateProfile(data.session.user)
+          currentUser.value = user
+          localStorage.setItem('currentUser', JSON.stringify(user))
+        } catch (_) {
+          // offline: conservar perfil ya cargado desde localStorage
+        }
       }
-    } else {
-      currentUser.value = null
-      localStorage.removeItem('currentUser')
     }
+    // Si no hay sesión activa pero sí hay usuario en localStorage,
+    // se conserva (modo offline). Solo se borra en logout() explícito.
   }
 
   return { currentUser, session, loading, isAuthenticated, userRole, isAdmin, displayName, login, logout, restoreSession }

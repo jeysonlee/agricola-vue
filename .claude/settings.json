@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat > *)"
+    ],
+    "additionalDirectories": [
+      "/home/jeyson/projects/agricola-vue"
+    ]
+  }
+}

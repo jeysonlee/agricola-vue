@@ -12,28 +12,30 @@
         <ion-card class="login-card">
           <ion-card-content>
 
-            <ion-item lines="full">
-              <ion-label position="floating">Correo electrónico</ion-label>
-              <ion-input
-                v-model="form.email"
-                type="email"
-                autocomplete="email"
-                inputmode="email"
-                @keyup.enter="handleLogin"
-              />
-            </ion-item>
+            <ion-input
+              label="Correo electrónico"
+              label-placement="floating"
+              fill="outline"
+              v-model="form.email"
+              type="email"
+              autocomplete="email"
+              inputmode="email"
+              @keyup.enter="handleLogin"
+            />
 
-            <ion-item lines="full" class="ion-margin-top">
-              <ion-label position="floating">Contraseña</ion-label>
-              <ion-input
-                v-model="form.password"
-                :type="showPassword ? 'text' : 'password'"
-                @keyup.enter="handleLogin"
-              />
+            <ion-input
+              label="Contraseña"
+              label-placement="floating"
+              fill="outline"
+              class="ion-margin-top"
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              @keyup.enter="handleLogin"
+            >
               <ion-button slot="end" fill="clear" @click="showPassword = !showPassword">
                 <ion-icon :icon="showPassword ? eyeOffOutline : eyeOutline" />
               </ion-button>
-            </ion-item>
+            </ion-input>
 
             <!-- Mensaje de error inline -->
             <div v-if="errorMsg" class="error-msg">
@@ -64,7 +66,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   IonPage, IonContent, IonCard, IonCardContent,
-  IonItem, IonLabel, IonInput, IonButton, IonIcon, IonSpinner,
+  IonInput, IonButton, IonIcon, IonSpinner,
   toastController,
 } from '@ionic/vue'
 import { leafOutline, eyeOutline, eyeOffOutline, alertCircleOutline } from 'ionicons/icons'
@@ -81,8 +83,6 @@ const errorMsg = ref('')
 async function handleLogin() {
   errorMsg.value = ''
 
-  console.log('[Login] handleLogin llamado', form.value.email)
-
   if (!form.value.email?.trim() || !form.value.password?.trim()) {
     errorMsg.value = 'Ingresa tu correo y contraseña'
     return
@@ -91,7 +91,6 @@ async function handleLogin() {
   loading.value = true
   try {
     await auth.login(form.value.email.trim(), form.value.password)
-    console.log('[Login] login exitoso, navegando a /tabs/home')
     router.replace('/tabs/home')
   } catch (err) {
     console.error('[Login] error:', err)

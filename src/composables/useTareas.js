@@ -13,5 +13,12 @@ export function useTareas() {
   const porParcela = (parcela_id) => query(TABLE, '*', { parcela_id }, { column: 'created_at', ascending: false })
   const porEstado = (estado) => query(TABLE, '*', { estado }, { column: 'created_at', ascending: false })
 
-  return { getAll, getOne, crear, editar, eliminar, porParcela, porEstado }
+  async function getAllByParcelas(ids) {
+    const all = await getAll()
+    if (ids === null) return all
+    if (!ids.length) return []
+    return all.filter(t => ids.includes(t.parcela_id))
+  }
+
+  return { getAll, getOne, crear, editar, eliminar, porParcela, porEstado, getAllByParcelas }
 }

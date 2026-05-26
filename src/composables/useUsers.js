@@ -1,11 +1,12 @@
 import { useSupabase } from './useSupabase'
 import { supabase } from '../config/supabase'
+import { supabaseAdmin } from '../config/supabaseAdmin'
 
 const TABLE = 'users'
 
 export function useUsers() {
   // users siempre va a Supabase — gestión de auth, no offline
-  const { create, readAll, getById, update, remove } = useSupabase()
+  const { create, getById, update, remove } = useSupabase()
 
   async function getAll() {
     const { data, error } = await supabase
@@ -51,5 +52,11 @@ export function useUsers() {
     return create(TABLE, profile)
   }
 
-  return { getAll, getOne, crear, editar, eliminar, displayName }
+  async function cambiarPassword(authId, nuevaPassword) {
+    if (!supabaseAdmin) throw new Error('Service key no configurada en .env.local')
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(authId, { password: nuevaPassword })
+    if (error) throw new Error(error.message)
+  }
+
+  return { getAll, getOne, crear, editar, eliminar, displayName, cambiarPassword }
 }

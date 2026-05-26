@@ -67,9 +67,11 @@ import {
 } from '@ionic/vue'
 import { addOutline, cashOutline, trashOutline } from 'ionicons/icons'
 import { useVentas } from '../../composables/useVentas'
+import { useAcceso } from '../../composables/useAcceso'
 import FormVentaModal from './FormVentaModal.vue'
 
-const { getAll, eliminarConReversion } = useVentas()
+const { getAllByParcelas, eliminarConReversion } = useVentas()
+const { getParcelaIds } = useAcceso()
 const items      = ref([])
 const searchText = ref('')
 const loading    = ref(false)
@@ -94,7 +96,8 @@ async function loadData() {
   if (loading.value) return
   loading.value = true
   try {
-    items.value = await getAll()
+    const ids = await getParcelaIds()
+    items.value = await getAllByParcelas(ids)
   } catch (e) {
     showToast('Error al cargar', 'danger')
   } finally {

@@ -16,10 +16,17 @@
             <ion-icon :icon="leafOutline" slot="start" color="success" />
             <ion-label>
               <h2>{{ parcelaNombre(item.parcela_id) }}</h2>
-              <p>{{ formatDate(item.fecha) }} — {{ item.cantidad }} {{ item.unidad }}</p>
+              <p>{{ formatDate(item.fecha_cosecha) }}</p>
+              <p>
+                <span v-if="item.kg_bruto">Bruto: {{ item.kg_bruto }} kg</span>
+                <span v-if="item.kg_bruto && item.kg_seco"> · </span>
+                <span v-if="item.kg_seco">Seco: {{ item.kg_seco }} kg</span>
+              </p>
               <p v-if="item.observaciones">{{ item.observaciones }}</p>
             </ion-label>
-            <ion-note slot="end" color="success">{{ item.cantidad }} {{ item.unidad }}</ion-note>
+            <ion-note slot="end" color="success">
+              {{ item.kg_seco || item.kg_bruto || 0 }} kg
+            </ion-note>
           </ion-item>
           <ion-item-options side="end">
             <ion-item-option color="danger" @click="confirmarEliminar(item)"><ion-icon slot="icon-only" :icon="trashOutline" /></ion-item-option>
@@ -30,9 +37,10 @@
         <ion-icon :icon="leafOutline" />
         <p>No hay cosechas registradas</p>
         <ion-button @click="openForm(null)">Registrar Cosecha</ion-button>
-      </div>    </ion-content>
+      </div>
+    </ion-content>
 
-      <ion-loading :is-open="loading" message="Cargando..." />
+    <ion-loading :is-open="loading" message="Cargando..." />
     <ion-modal :is-open="formOpen" @didDismiss="formOpen = false">
       <FormCosechaModal :cosecha="selected" :parcelas="parcelas" @saved="onSaved" @cancel="formOpen = false" />
     </ion-modal>
@@ -44,7 +52,7 @@ import { ref, computed, onMounted } from 'vue'
 import { onIonViewWillEnter } from '@ionic/vue'
 import AppHeader from '../../components/AppHeader.vue'
 import {
-  IonPage, IonToolbar, IonButtons, IonButton, IonIcon,
+  IonPage, IonToolbar, IonButton, IonIcon,
   IonContent, IonList, IonItem, IonItemSliding, IonItemOptions, IonItemOption,
   IonLabel, IonNote, IonSearchbar, IonRefresher, IonRefresherContent, IonLoading,
   IonModal, alertController, toastController,
@@ -52,28 +60,33 @@ import {
 import { addOutline, leafOutline, trashOutline } from 'ionicons/icons'
 import { useCosechas } from '../../composables/useCosechas'
 import { useParcelas } from '../../composables/useParcelas'
+import { useAcceso }   from '../../composables/useAcceso'
 import FormCosechaModal from './FormCosechaModal.vue'
 
-const { getAll, eliminar } = useCosechas()
-const { getAll: getParcelas } = useParcelas()
-const items = ref([])
-const parcelas = ref([])
+const { getAllByParcelas, eliminar } = useCosechas()
+const { getAll: getParcelas }       = useParcelas()
+const { getParcelaIds }             = useAcceso()
+const items      = ref([])
+const parcelas   = ref([])
 const searchText = ref('')
-const loading = ref(false)
-const formOpen = ref(false)
-const selected = ref(null)
+const loading    = ref(false)
+const formOpen   = ref(false)
+const selected   = ref(null)
 
 const filtered = computed(() =>
   items.value.filter(i => !searchText.value || parcelaNombre(i.parcela_id).toLowerCase().includes(searchText.value.toLowerCase()))
 )
 function parcelaNombre(id) { return parcelas.value.find(p => p.id === id)?.nombre || '-' }
-function formatDate(d) { return d ? new Date(d).toLocaleDateString('es-PE') : '-' }
+function formatDate(d) { return d ? new Date(d + 'T12:00:00').toLocaleDateString('es-PE') : '-' }
 
 async function loadData() {
   if (loading.value) return
   loading.value = true
-  try { const [c, p] = await Promise.all([getAll(), getParcelas()]); items.value = c; parcelas.value = p }
-  catch (e) { showToast('Error al cargar', 'danger') }
+  try {
+    const [ids, p] = await Promise.all([getParcelaIds(), getParcelas()])
+    parcelas.value = p
+    items.value = await getAllByParcelas(ids)
+  } catch (e) { showToast('Error al cargar', 'danger') }
   finally { loading.value = false }
 }
 function openForm(item) { selected.value = item; formOpen.value = true }

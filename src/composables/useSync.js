@@ -1,4 +1,3 @@
-import { Network } from '@capacitor/network'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { supabase } from '../config/supabase'
 import { useLocalDB } from './useLocalDB'
@@ -8,7 +7,6 @@ import { useSyncStore } from '../stores/sync'
 const TABLES = [
   'parcelas',
   'parcela_users',
-  'obreros',
   'tareas',
   'costo_obreros',
   'costo_herramientas',
@@ -18,7 +16,12 @@ const TABLES = [
   'venta_cosecha_detalle',
 ]
 
-const TABLES_WITH_FOTO = new Set(['obreros'])
+const TABLES_WITH_FOTO = new Set()
+
+// Columnas que existen en SQLite por compatibilidad histórica pero NO están en Supabase
+const STRIP_ON_UPLOAD = {
+  cosechas: ['fecha', 'cantidad', 'unidad'],
+}
 
 export function useSync() {
   const store   = useSyncStore()
@@ -31,7 +34,7 @@ export function useSync() {
   }
 
   // Foto local → Supabase Storage.
-  // La ruta local es una ruta relativa en Directory.Data (ej: "obreros/uuid.jpg").
+  // La ruta local es relativa en Directory.Data (ej: "fotos/uuid.jpg").
   // No es base64 — se lee el archivo real del filesystem.
   async function subirFotoLocal(table, row) {
     if (!TABLES_WITH_FOTO.has(table)) return row
@@ -69,11 +72,13 @@ export function useSync() {
 
   async function uploadUnsynced(table) {
     const unsynced = await local.getUnsynced(table)
+    const strip    = STRIP_ON_UPLOAD[table]
     for (const row of unsynced) {
       try {
         let data = { ...row }
         delete data.is_synced
         delete data.synced_at
+        if (strip) for (const col of strip) delete data[col]
 
         data = await subirFotoLocal(table, data)
 
@@ -123,9 +128,6 @@ export function useSync() {
 
   async function syncAll() {
     if (store.syncing) return
-
-    const { connected } = await Network.getStatus()
-    if (!connected) return { ok: false, reason: 'sin_internet' }
 
     store.syncing = true
     store.errors  = []

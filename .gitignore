@@ -30,3 +30,7 @@ npm-debug.log*
 /platforms
 /plugins
 /www
+
+# Variables de entorno locales (contienen claves secretas)
+.env.local
+.env.*.local

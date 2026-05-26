@@ -18,7 +18,7 @@
           <div class="user-info">
             <div class="user-avatar">{{ initials }}</div>
             <div class="user-details">
-              <strong>{{ auth.currentUser?.name || auth.currentUser?.email }}</strong>
+              <strong>{{ auth.displayName || auth.currentUser?.email }}</strong>
               <small>{{ auth.currentUser?.role || 'usuario' }}</small>
             </div>
           </div>
@@ -57,39 +57,94 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   IonApp, IonSplitPane, IonMenu, IonMenuToggle,
   IonPage, IonRouterOutlet,
   IonHeader, IonToolbar, IonContent, IonFooter,
   IonList, IonItem, IonLabel, IonIcon,
-  alertController,
+  alertController, toastController,
 } from '@ionic/vue'
 import {
   leafOutline, homeOutline, mapOutline, clipboardOutline,
-  peopleOutline, cashOutline, personOutline, logOutOutline,
+  cashOutline, personOutline, logOutOutline,
 } from 'ionicons/icons'
 import { useAuthStore } from './stores/auth'
+import { useTareas }    from './composables/useTareas'
+import { useParcelas }  from './composables/useParcelas'
+import { useAcceso }    from './composables/useAcceso'
+import { clasificarTareas, generarNotificacionesDeTareas, useNotificaciones } from './composables/useNotificaciones'
+import { useNotificacionesStore } from './stores/notificaciones'
 
 const auth   = useAuthStore()
 const route  = useRoute()
 const router = useRouter()
+const { getAllByParcelas }                          = useTareas()
+const { getAll: getParcelas }                      = useParcelas()
+const { getParcelaIds }                            = useAcceso()
+const { sincronizarNotificaciones, notificarOverdueNativo } = useNotificaciones()
+const notifStore                                   = useNotificacionesStore()
+
+let startupDone = false
+
+async function verificarTareasAlInicio() {
+  if (startupDone || !auth.isAuthenticated) return
+  startupDone = true
+  try {
+    const [ids, parcelas] = await Promise.all([getParcelaIds(), getParcelas()])
+    const tareas     = await getAllByParcelas(ids)
+    const parcelaMap = Object.fromEntries(parcelas.map(p => [p.id, p.nombre]))
+    const grupos     = clasificarTareas(tareas)
+
+    // Poblar store de notificaciones (bell icon en header)
+    notifStore.setNotificaciones(generarNotificacionesDeTareas(tareas, parcelaMap))
+
+    // Re-sincronizar alarmas nativas programadas
+    sincronizarNotificaciones(tareas)
+
+    // Notificación nativa inmediata para vencidas (1 vez/día)
+    notificarOverdueNativo(grupos, notifStore)
+
+    const total = grupos.vencidas.length + grupos.hoy.length + grupos.manana.length + grupos.semana.length
+    if (!total) return
+
+    const partes = []
+    if (grupos.vencidas.length) partes.push(`${grupos.vencidas.length} vencida${grupos.vencidas.length > 1 ? 's' : ''}`)
+    if (grupos.hoy.length)      partes.push(`${grupos.hoy.length} para hoy`)
+    if (grupos.manana.length)   partes.push(`${grupos.manana.length} para mañana`)
+    if (grupos.semana.length)   partes.push(`${grupos.semana.length} esta semana`)
+
+    const t = await toastController.create({
+      message: `Tareas: ${partes.join(' · ')}`,
+      duration: 4000,
+      color:    grupos.vencidas.length || grupos.hoy.length ? 'danger' : 'warning',
+      position: 'top',
+      buttons:  [{ text: 'Ver', handler: () => router.push('/tabs/tareas') }],
+    })
+    t.present()
+  } catch (_) {}
+}
+
+watch(() => auth.isAuthenticated, (val) => { if (val) verificarTareasAlInicio() }, { immediate: true })
+onMounted(() => { if (auth.isAuthenticated) verificarTareasAlInicio() })
 
 const initials = computed(() => {
-  const str = auth.currentUser?.name || auth.currentUser?.email || '?'
+  const str = auth.displayName || auth.currentUser?.email || '?'
   return str.split(/[\s@]/).map(s => s[0]).join('').toUpperCase().substring(0, 2)
 })
 
-const navItems = [
-  { label: 'Inicio',         path: '/tabs/home',        icon: homeOutline },
-  { label: 'Parcelas',       path: '/tabs/parcelas',    icon: mapOutline },
-  { label: 'Tareas',         path: '/tabs/tareas',      icon: clipboardOutline },
-  { label: 'Cosechas',       path: '/tabs/cosechas',    icon: leafOutline },
-  { label: 'Ventas',         path: '/tabs/ventas',      icon: cashOutline },
-  { label: 'Obreros',        path: '/tabs/obreros',     icon: peopleOutline },
-  { label: 'Usuarios',       path: '/tabs/users',       icon: personOutline },
-]
+const navItems = computed(() => {
+  const items = [
+    { label: 'Inicio',   path: '/tabs/home',     icon: homeOutline },
+    { label: 'Parcelas', path: '/tabs/parcelas', icon: mapOutline },
+    { label: 'Tareas',   path: '/tabs/tareas',   icon: clipboardOutline },
+    { label: 'Cosechas', path: '/tabs/cosechas', icon: leafOutline },
+    { label: 'Ventas',   path: '/tabs/ventas',   icon: cashOutline },
+  ]
+  if (auth.isAdmin) items.push({ label: 'Usuarios', path: '/tabs/users', icon: personOutline })
+  return items
+})
 
 function isActive(path) {
   return route.path === path || route.path.startsWith(path + '/')
