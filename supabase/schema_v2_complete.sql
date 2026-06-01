@@ -166,6 +166,7 @@ CREATE TABLE costo_insumos (
   tipo_insumo    TEXT DEFAULT 'otro'
                  CHECK (tipo_insumo IN ('insecticida','fungicida','foliar','abono','herbicida','otro')),
   nombre         TEXT NOT NULL,
+  unidad         TEXT NOT NULL DEFAULT 'unidad',
   cantidad       NUMERIC DEFAULT 1,
   costo_unitario NUMERIC DEFAULT 0,
   subtotal       NUMERIC DEFAULT 0,
@@ -352,3 +353,17 @@ FROM parcelas p
 LEFT JOIN reporte_ingresos_parcela ing ON ing.parcela_id = p.id
 LEFT JOIN reporte_egresos_parcela  egr ON egr.parcela_id = p.id
 WHERE p.deleted_at IS NULL;
+
+
+-- ════════════════════════════════════════════════════════════════
+-- 14. TABLA users — COLUMNAS RBAC
+--     users es gestionada por Supabase Auth / lathing-app.
+--     Se agregan columnas extra si no existen.
+-- ════════════════════════════════════════════════════════════════
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_id    TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name  TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone      TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username   TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role       TEXT NOT NULL DEFAULT 'productor';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status     TEXT NOT NULL DEFAULT 'activo';

@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /agricola-vue/
+
+  # Si ya viene de dist/, no hacer nada
+  RewriteCond %{REQUEST_URI} ^/agricola-vue/dist/
+  RewriteRule ^ - [L]
+
+  # Redirigir raíz a dist/index.html
+  RewriteRule ^$ dist/index.html [L]
+
+  # Todo lo demás, redirigir a dist/
+  RewriteRule ^(.+)$ dist/$1 [L]
+</IfModule>

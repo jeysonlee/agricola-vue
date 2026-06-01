@@ -5,7 +5,7 @@
 
         <div class="login-header">
           <ion-icon :icon="leafOutline" class="app-icon" />
-          <h1>Agrícola</h1>
+          <h1>AGROGEST</h1>
           <p>Sistema de Gestión Agrícola</p>
         </div>
 
