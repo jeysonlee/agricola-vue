@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:apk": "vite build --base=/ && npx cap sync android && bash -c \"export JAVA_HOME='/c/Program Files/Android/Android Studio/jbr' && cd android && ./gradlew assembleDebug --no-daemon\"",
+    "build:apk": "vite build --base=/ && npx cap sync android && cd android && .\\gradlew.bat assembleDebug --no-daemon",
     "preview": "vite preview",
     "test:e2e": "cypress run",
     "test:unit": "vitest",

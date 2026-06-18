@@ -70,22 +70,26 @@ import {
   leafOutline, homeOutline, mapOutline, clipboardOutline,
   cashOutline, personOutline, logOutOutline,
 } from 'ionicons/icons'
+import { Network } from '@capacitor/network'
 import { useAuthStore } from './stores/auth'
+import { useSync }      from './composables/useSync'
 import { useTareas }    from './composables/useTareas'
 import { useParcelas }  from './composables/useParcelas'
 import { useAcceso }    from './composables/useAcceso'
 import { clasificarTareas, generarNotificacionesDeTareas, useNotificaciones } from './composables/useNotificaciones'
 import { useNotificacionesStore } from './stores/notificaciones'
 
-const auth   = useAuthStore()
-const route  = useRoute()
-const router = useRouter()
+const auth    = useAuthStore()
+const route   = useRoute()
+const router  = useRouter()
+const { syncAll }                                  = useSync()
 const { getAllByParcelas }                          = useTareas()
 const { getAll: getParcelas }                      = useParcelas()
 const { getParcelaIds }                            = useAcceso()
 const { sincronizarNotificaciones, notificarOverdueNativo } = useNotificaciones()
 const notifStore                                   = useNotificacionesStore()
 
+const isNative = () => !!window.Capacitor?.isNativePlatform?.()
 let startupDone = false
 
 async function verificarTareasAlInicio() {
@@ -127,7 +131,46 @@ async function verificarTareasAlInicio() {
 }
 
 watch(() => auth.isAuthenticated, (val) => { if (val) verificarTareasAlInicio() }, { immediate: true })
-onMounted(() => { if (auth.isAuthenticated) verificarTareasAlInicio() })
+
+onMounted(async () => {
+  // 1. Restaurar sesión y verificar expiración (12h)
+  const sesionValida = await auth.restoreSession()
+
+  if (!sesionValida) {
+    // Sesión expirada o inválida → el router guard redirige a /login
+    router.replace('/login')
+    return
+  }
+
+  // 2. Notificar al usuario si la sesión vence pronto (< 30 min)
+  if (auth.minutosRestantes > 0 && auth.minutosRestantes < 30) {
+    const t = await toastController.create({
+      message: `Tu sesión vence en ${auth.minutosRestantes} minutos. Guarda tus cambios.`,
+      duration: 5000,
+      color: 'warning',
+      position: 'top',
+    })
+    t.present()
+  }
+
+  if (auth.isAuthenticated) {
+    verificarTareasAlInicio()
+
+    // 3. Sync de arranque en nativo (silencioso, en segundo plano)
+    if (isNative()) {
+      try {
+        const status = await Network.getStatus()
+        if (status.connected) {
+          syncAll().then(result => {
+            if (result.ok) {
+              localStorage.setItem('sync_first_done', '1')
+            }
+          })
+        }
+      } catch (_) { /* sin conexión: continuar offline */ }
+    }
+  }
+})
 
 const initials = computed(() => {
   const str = auth.displayName || auth.currentUser?.email || '?'

@@ -87,6 +87,18 @@ const DDL = `
     porcentaje_total_venta REAL DEFAULT 0,
     cantidad_vendida_kg REAL DEFAULT 0, subtotal REAL DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY NOT NULL, ${C},
+    auth_id TEXT,
+    username TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    email TEXT,
+    phone TEXT,
+    role TEXT NOT NULL DEFAULT 'admin',
+    status TEXT NOT NULL DEFAULT 'activo'
+  );
 `
 
 // Columnas que pueden faltar en bases de datos ya instaladas (migración incremental)
@@ -107,10 +119,17 @@ export async function initSQLite() {
   if (isWeb) {
     await CapacitorSQLite.initWebStore()
   } else if (platform === 'android') {
-    await CapacitorSQLite.requestPermissions()
+    try {
+      await CapacitorSQLite.requestPermissions()
+    } catch (_) {}
   }
 
-  db = await sqlite.createConnection(DB_NAME, false, 'no-encryption', DB_VERSION, false)
+  const isConn = await sqlite.isConnection(DB_NAME, false)
+  if (isConn.result) {
+    db = await sqlite.retrieveConnection(DB_NAME, false)
+  } else {
+    db = await sqlite.createConnection(DB_NAME, false, 'no-encryption', DB_VERSION, false)
+  }
   await db.open()
 
   await db.execute(DDL)

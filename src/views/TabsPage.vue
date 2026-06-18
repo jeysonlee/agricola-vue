@@ -39,6 +39,10 @@
       </ion-header>
       <ion-content class="ion-padding">
         <ion-list>
+          <ion-item button @click="navigate('/tabs/clima')">
+            <ion-icon :icon="cloudOutline"   slot="start" color="primary" />
+            <ion-label>Clima Agrícola</ion-label>
+          </ion-item>
           <ion-item button @click="navigate('/tabs/cosechas')">
             <ion-icon :icon="leafOutline"    slot="start" color="success" />
             <ion-label>Cosechas</ion-label>
@@ -76,6 +80,7 @@ import {
 import {
   homeOutline, mapOutline, clipboardOutline, menuOutline,
   closeOutline, leafOutline, cashOutline, personOutline, logOutOutline, personCircleOutline,
+  cloudOutline,
 } from 'ionicons/icons'
 import { useAuthStore } from '../stores/auth'
 

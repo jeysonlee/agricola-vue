@@ -2,10 +2,16 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../config/supabase'
 
+const SESSION_HOURS = 12
+const SESSION_MS    = SESSION_HOURS * 60 * 60 * 1000
+
 export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref(JSON.parse(localStorage.getItem('currentUser') || 'null'))
-  const session = ref(null)
-  const loading = ref(false)
+  const session     = ref(null)
+  const loading     = ref(false)
+
+  // Momento del último login exitoso (ms epoch). 0 = nunca.
+  const loginAt = ref(Number(localStorage.getItem('loginAt') || 0))
 
   const isAuthenticated = computed(() => !!currentUser.value)
   const userRole        = computed(() => currentUser.value?.role || null)
@@ -14,7 +20,18 @@ export const useAuthStore = defineStore('auth', () => {
     return role === 'admin' || role === 'superadmin'
   })
 
-  // Nombre para mostrar: first_name + last_name, o username, o email
+  // True cuando han pasado más de SESSION_HOURS desde el último login
+  const sessionExpired = computed(() => {
+    if (!loginAt.value || !currentUser.value) return false
+    return Date.now() - loginAt.value > SESSION_MS
+  })
+
+  // Minutos restantes de sesión (negativo = ya expiró)
+  const minutosRestantes = computed(() => {
+    if (!loginAt.value) return 0
+    return Math.round((SESSION_MS - (Date.now() - loginAt.value)) / 60_000)
+  })
+
   const displayName = computed(() => {
     const u = currentUser.value
     if (!u) return ''
@@ -23,7 +40,6 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   async function fetchOrCreateProfile(authUser) {
-    // 1. Buscar por auth_id
     let { data: profile } = await supabase
       .from('users')
       .select('*')
@@ -32,7 +48,6 @@ export const useAuthStore = defineStore('auth', () => {
 
     if (profile) return profile
 
-    // 2. Buscar por email (el admin puede haberse creado sin auth_id)
     const { data: byEmail } = await supabase
       .from('users')
       .select('*')
@@ -40,14 +55,12 @@ export const useAuthStore = defineStore('auth', () => {
       .maybeSingle()
 
     if (byEmail) {
-      // Vincular auth_id si faltaba
       if (!byEmail.auth_id) {
         await supabase.from('users').update({ auth_id: authUser.id }).eq('id', byEmail.id)
       }
       return { ...byEmail, auth_id: authUser.id }
     }
 
-    // 3. No existe perfil — crearlo automáticamente (primer login)
     const { v4: uuidv4 } = await import('uuid')
     const now = new Date().toISOString()
     const newProfile = {
@@ -68,7 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     const { data: created, error } = await supabase.from('users').insert(newProfile).select().single()
     if (error) {
-      console.warn('[Auth] No se pudo crear perfil en public.users:', error.message)
+      console.warn('[Auth] No se pudo crear perfil:', error.message)
       return newProfile
     }
     return created
@@ -85,6 +98,11 @@ export const useAuthStore = defineStore('auth', () => {
       const user = await fetchOrCreateProfile(data.user)
       currentUser.value = user
       localStorage.setItem('currentUser', JSON.stringify(user))
+
+      // Registrar momento exacto del login para control de expiración
+      loginAt.value = Date.now()
+      localStorage.setItem('loginAt', String(loginAt.value))
+
       return user
     } finally {
       loading.value = false
@@ -92,29 +110,56 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    await supabase.auth.signOut()
+    try { await supabase.auth.signOut() } catch (_) {}
     currentUser.value = null
-    session.value = null
+    session.value     = null
+    loginAt.value     = 0
     localStorage.removeItem('currentUser')
+    localStorage.removeItem('loginAt')
   }
 
+  // Llamar al arrancar la app. Devuelve false si la sesión expiró o no existe.
   async function restoreSession() {
-    const { data } = await supabase.auth.getSession()
-    if (data.session) {
-      session.value = data.session
-      if (!currentUser.value) {
-        try {
+    // Si la sesión expiró, cerrar automáticamente
+    if (sessionExpired.value) {
+      await logout()
+      return false
+    }
+
+    try {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        session.value = data.session
+        if (!currentUser.value) {
           const user = await fetchOrCreateProfile(data.session.user)
           currentUser.value = user
           localStorage.setItem('currentUser', JSON.stringify(user))
-        } catch (_) {
-          // offline: conservar perfil ya cargado desde localStorage
         }
+      } else if (currentUser.value && loginAt.value) {
+        // Sin sesión Supabase pero hay datos locales.
+        // Solo permitir modo offline si realmente no hay red.
+        // Con red: Supabase no reconoce la sesión (instalación limpia o token borrado) → forzar login.
+        if (navigator.onLine) {
+          await logout()
+          return false
+        }
+      } else {
+        // Sin nada: cerrar
+        await logout()
+        return false
       }
+    } catch (_) {
+      // Error de red: permitir modo offline si hay datos y la sesión no expiró
     }
-    // Si no hay sesión activa pero sí hay usuario en localStorage,
-    // se conserva (modo offline). Solo se borra en logout() explícito.
+
+    return true
   }
 
-  return { currentUser, session, loading, isAuthenticated, userRole, isAdmin, displayName, login, logout, restoreSession }
+  return {
+    currentUser, session, loading, loginAt,
+    isAuthenticated, userRole, isAdmin, displayName,
+    sessionExpired, minutosRestantes,
+    login, logout, restoreSession,
+    SESSION_HOURS,
+  }
 })

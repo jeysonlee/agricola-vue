@@ -1,6 +1,17 @@
 import { v4 as uuidv4 } from 'uuid'
 import { getSQLite, saveWebStore } from './useSQLite'
 
+// Caché de columnas por tabla para filtrar columnas extra de Supabase
+const _colCache = {}
+
+async function _getTableCols(d, table) {
+  if (!_colCache[table]) {
+    const res = await d.query(`PRAGMA table_info(${table})`)
+    _colCache[table] = new Set((res.values || []).map(r => r.name))
+  }
+  return _colCache[table]
+}
+
 // Mismo API que useSupabase.js — drop-in replacement para modo offline
 
 export function useLocalDB() {
@@ -100,15 +111,22 @@ export function useLocalDB() {
     await saveWebStore()
   }
 
-  // Inserta o actualiza desde remoto (ya sincronizado)
+  // Inserta o actualiza desde remoto (ya sincronizado).
+  // Filtra columnas que no existen en SQLite para evitar errores por esquemas distintos.
   async function upsertFromRemote(table, row) {
     const now = new Date().toISOString()
-    row.is_synced = 1
-    row.synced_at = now
-    const cols  = Object.keys(row)
-    const vals  = Object.values(row)
+    const d = db()
+    const known = await _getTableCols(d, table)
+
+    const filtered = { is_synced: 1, synced_at: now }
+    for (const [k, v] of Object.entries(row)) {
+      if (known.has(k)) filtered[k] = v
+    }
+
+    const cols  = Object.keys(filtered)
+    const vals  = Object.values(filtered)
     const marks = cols.map(() => '?').join(', ')
-    await db().run(
+    await d.run(
       `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${marks})`,
       vals
     )

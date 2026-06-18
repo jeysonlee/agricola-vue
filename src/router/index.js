@@ -28,6 +28,7 @@ const routes = [
       { path: 'ventas', name: 'Ventas', component: () => import('../views/ventas/ListVentasPage.vue') },
       { path: 'cosechas', name: 'Cosechas', component: () => import('../views/cosechas/ListCosechasPage.vue') },
       { path: 'perfil',   name: 'Perfil',   component: () => import('../views/ProfilePage.vue') },
+      { path: 'clima',    name: 'Clima',    component: () => import('../views/clima/ClimaPage.vue') },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/login' },
@@ -40,11 +41,21 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    next('/login')
-  } else {
-    next()
+
+  if (to.meta.requiresAuth) {
+    // Sesión expirada: forzar re-login aunque haya datos en localStorage
+    if (auth.sessionExpired) {
+      auth.logout()
+      next('/login')
+      return
+    }
+    if (!auth.isAuthenticated) {
+      next('/login')
+      return
+    }
   }
+
+  next()
 })
 
 export default router

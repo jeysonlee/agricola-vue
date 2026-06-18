@@ -3,8 +3,11 @@ import { supabase } from '../config/supabase'
 import { useLocalDB } from './useLocalDB'
 import { useStorage } from './useStorage'
 import { useSyncStore } from '../stores/sync'
+import { initSQLite, getSQLite } from './useSQLite'
+import { checkOnline } from './useNetwork'
 
 const TABLES = [
+  'users',
   'parcelas',
   'parcela_users',
   'tareas',
@@ -127,7 +130,15 @@ export function useSync() {
   }
 
   async function syncAll() {
-    if (store.syncing) return
+    if (store.syncing) return { ok: false, reason: 'Sincronización ya en curso' }
+
+    if (!getSQLite()) {
+      try {
+        await initSQLite()
+      } catch (e) {
+        return { ok: false, reason: e.message }
+      }
+    }
 
     store.syncing = true
     store.errors  = []

@@ -1,0 +1,6 @@
+RewriteEngine On
+RewriteBase /agricola-vue/
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /agricola-vue/index.html [L]
