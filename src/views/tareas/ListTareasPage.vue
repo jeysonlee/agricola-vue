@@ -18,62 +18,48 @@
         <ion-refresher-content />
       </ion-refresher>
 
-      <div v-if="!loading && filtered.length" class="tareas-list">
-        <div
-          v-for="item in filtered"
-          :key="item.id"
-          class="tarea-card"
-          :class="`accent-${statusColor(item.estado)}`"
-          @click="verDetalle(item)"
-        >
-          <!-- urgency strip if applicable -->
-          <div v-if="urgenciaTarea(item)" class="urgencia-strip" :class="`strip-${urgenciaColor(urgenciaTarea(item))}`" />
+      <div v-if="!loading && filtered.length" class="list-card">
+        <ion-list lines="none">
+          <ion-item-sliding v-for="item in filtered" :key="item.id">
+            <!-- Swipe izquierda → Editar -->
+            <ion-item-options side="start">
+              <ion-item-option color="primary" :router-link="`/tabs/tareas/${item.id}/editar`">
+                <ion-icon slot="icon-only" :icon="createOutline" />
+              </ion-item-option>
+            </ion-item-options>
 
-          <div class="tarea-card-inner">
-            <!-- top row -->
-            <div class="tarea-card-top">
-              <span class="tarea-tipo">{{ item.tipo_tarea || 'Sin tipo' }}</span>
-              <div class="tarea-badges">
-                <ion-badge :color="statusColor(item.estado)" class="estado-badge">{{ estadoLabel(item.estado) }}</ion-badge>
-                <ion-badge v-if="urgenciaTarea(item)" :color="urgenciaColor(urgenciaTarea(item))" class="urgencia-badge">
+            <ion-item button detail @click="verDetalle(item)">
+              <div slot="start" :class="['item-avatar', `av-${statusColor(item.estado)}`]">
+                <ion-icon :icon="clipboardOutline" />
+              </div>
+              <ion-label>
+                <h3>{{ item.tipo_tarea || 'Sin tipo' }}</h3>
+                <p>{{ parcelaNombre(item.parcela_id) }} · {{ formatDateLabel(item) || '—' }}</p>
+                <p v-if="item.costo_total > 0">S/ {{ (+item.costo_total).toFixed(2) }}</p>
+              </ion-label>
+              <div slot="end" class="item-end">
+                <ion-badge :color="statusColor(item.estado)" class="end-badge">{{ estadoLabel(item.estado) }}</ion-badge>
+                <ion-badge v-if="urgenciaTarea(item)" :color="urgenciaColor(urgenciaTarea(item))" class="end-badge urgencia">
                   {{ urgenciaLabel(urgenciaTarea(item)) }}
                 </ion-badge>
               </div>
-            </div>
+            </ion-item>
 
-            <!-- middle info -->
-            <div class="tarea-card-meta">
-              <span class="meta-chip">
-                <ion-icon :icon="mapOutline" /> {{ parcelaNombre(item.parcela_id) }}
-              </span>
-              <span class="meta-chip">
-                <ion-icon :icon="calendarOutline" /> {{ formatDateLabel(item) || '—' }}
-              </span>
-              <span v-if="item.costo_total > 0" class="meta-chip meta-cost">
-                <ion-icon :icon="cashOutline" /> S/ {{ (+item.costo_total).toFixed(2) }}
-              </span>
-            </div>
-
-            <p v-if="item.descripcion" class="tarea-desc">{{ item.descripcion }}</p>
-
-            <!-- actions -->
-            <div class="tarea-card-actions" @click.stop>
-              <ion-button fill="clear" size="small" color="primary" :router-link="`/tabs/tareas/${item.id}/editar`">
-                <ion-icon slot="start" :icon="createOutline" /> Editar
-              </ion-button>
-              <ion-button fill="clear" size="small" color="danger" :disabled="eliminando === item.id" @click="confirmarEliminar(item)">
-                <ion-spinner v-if="eliminando === item.id" name="crescent" style="width:14px;height:14px" />
-                <ion-icon v-else slot="start" :icon="trashOutline" />
-                {{ eliminando === item.id ? '' : 'Eliminar' }}
-              </ion-button>
-            </div>
-          </div>
-        </div>
+            <!-- Swipe derecha → Eliminar -->
+            <ion-item-options side="end">
+              <ion-item-option color="danger" :disabled="eliminando === item.id" @click="confirmarEliminar(item)">
+                <ion-spinner v-if="eliminando === item.id" name="crescent" style="width:18px;height:18px" />
+                <ion-icon v-else slot="icon-only" :icon="trashOutline" />
+              </ion-item-option>
+            </ion-item-options>
+          </ion-item-sliding>
+        </ion-list>
       </div>
 
       <div v-else-if="!loading && !filtered.length" class="empty-state">
-        <ion-icon :icon="clipboardOutline" />
-        <p>No hay tareas registradas</p>
+        <ion-icon :icon="clipboardOutline" class="empty-icon" />
+        <h3>Sin tareas</h3>
+        <p>No hay tareas registradas aún</p>
         <ion-button router-link="/tabs/tareas/nueva">Agregar Tarea</ion-button>
       </div>
     </ion-content>
@@ -190,9 +176,10 @@ import { ref, computed, onMounted } from 'vue'
 import { onIonViewWillEnter } from '@ionic/vue'
 import AppHeader from '../../components/AppHeader.vue'
 import {
-  IonPage, IonButton, IonIcon,
-  IonContent, IonSearchbar, IonRefresher,
-  IonRefresherContent, IonLoading, IonModal, IonBadge, IonSpinner,
+  IonPage, IonButton, IonIcon, IonToolbar,
+  IonContent, IonList, IonItem, IonItemSliding, IonItemOptions, IonItemOption,
+  IonLabel, IonBadge, IonSpinner, IonSearchbar, IonRefresher,
+  IonRefresherContent, IonLoading, IonModal,
   alertController, toastController,
 } from '@ionic/vue'
 import { addOutline, clipboardOutline, createOutline, trashOutline, closeOutline, mapOutline, calendarOutline, cashOutline, documentTextOutline, chatboxOutline } from 'ionicons/icons'
@@ -337,73 +324,48 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+/* ── List design (sistema unificado) ── */
+.list-card {
+  margin: 8px 12px 16px;
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 8px rgba(0,0,0,.08);
+  background: var(--ion-item-background, #fff);
+}
+.list-card ion-list { padding: 0; background: transparent; }
+
+ion-item {
+  --padding-start: 14px; --inner-padding-end: 6px;
+  --min-height: 72px; --background: transparent;
+  --border-color: rgba(0,0,0,.06);
+  --detail-icon-color: var(--ion-color-medium); --detail-icon-font-size: 14px;
+}
+ion-label h3 { font-size: 15px !important; font-weight: 700 !important; color: var(--ion-color-dark) !important; margin-bottom: 2px !important; }
+ion-label p  { font-size: 13px !important; color: var(--ion-color-medium-shade) !important; margin: 0 !important; }
+
+.item-avatar {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-right: 4px;
+}
+.item-avatar ion-icon { font-size: 22px; color: #fff; }
+.av-primary  { background: var(--ion-color-primary); }
+.av-warning  { background: #d97706; }
+.av-success  { background: var(--ion-color-success); }
+.av-danger   { background: var(--ion-color-danger); }
+.av-medium   { background: var(--ion-color-medium); }
+
+.item-end    { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.end-badge   { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 700; }
+.urgencia    { font-size: 9px; }
+
 /* ── Empty state ── */
 .empty-state {
   display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 60vh;
-  color: var(--ion-color-medium); gap: 12px;
+  gap: 14px; padding: 64px 28px; text-align: center;
 }
-.empty-state ion-icon { font-size: 64px; }
-
-/* ── Task cards list ── */
-.tareas-list { padding: 10px 12px 80px; display: flex; flex-direction: column; gap: 10px; }
-
-.tarea-card {
-  border-radius: 14px;
-  background: var(--ion-item-background, #fff);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-  overflow: hidden;
-  cursor: pointer;
-  display: flex;
-  transition: box-shadow 0.15s;
-}
-.tarea-card:active { box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
-
-/* left accent bar */
-.tarea-card.accent-primary  { border-left: 4px solid var(--ion-color-primary); }
-.tarea-card.accent-warning  { border-left: 4px solid var(--ion-color-warning); }
-.tarea-card.accent-success  { border-left: 4px solid var(--ion-color-success); }
-.tarea-card.accent-danger   { border-left: 4px solid var(--ion-color-danger); }
-.tarea-card.accent-medium   { border-left: 4px solid var(--ion-color-medium); }
-
-/* top urgency strip */
-.urgencia-strip {
-  display: none; /* shown via background on inner */
-}
-.strip-danger  { background: var(--ion-color-danger); }
-.strip-warning { background: var(--ion-color-warning); }
-
-.tarea-card-inner { flex: 1; padding: 12px 14px 8px; min-width: 0; }
-
-.tarea-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.tarea-tipo { font-size: 0.95rem; font-weight: 700; color: var(--ion-text-color); flex: 1; line-height: 1.3; }
-
-.tarea-badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-.estado-badge   { font-size: 0.65rem; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
-.urgencia-badge { font-size: 0.62rem; padding: 3px 7px; border-radius: 20px; font-weight: 700; }
-
-.tarea-card-meta {
-  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px;
-}
-.meta-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 0.75rem; color: var(--ion-color-medium);
-  background: var(--ion-color-light); border-radius: 20px; padding: 3px 8px;
-}
-.meta-chip ion-icon { font-size: 0.85rem; }
-.meta-cost { color: var(--ion-color-success-shade); background: rgba(var(--ion-color-success-rgb), 0.1); }
-
-.tarea-desc {
-  font-size: 0.78rem; color: var(--ion-color-medium);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  margin: 2px 0 6px;
-}
-
-.tarea-card-actions {
-  display: flex; justify-content: flex-end; gap: 0;
-  border-top: 1px solid var(--ion-color-light-shade); margin-top: 6px; padding-top: 2px;
-}
-.tarea-card-actions ion-button { --padding-start: 8px; --padding-end: 8px; font-size: 0.78rem; height: 34px; }
+.empty-icon { font-size: 56px; color: var(--ion-color-medium); opacity: .4; }
+.empty-state h3 { font-size: 18px; font-weight: 700; color: var(--ion-color-dark); margin: 0; }
+.empty-state p  { font-size: 14px; color: var(--ion-color-medium); margin: 0; }
 
 /* ── Detail modal ── */
 .detalle-content { --background: var(--ion-background-color); }

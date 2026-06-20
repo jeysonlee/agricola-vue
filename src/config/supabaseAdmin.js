@@ -7,6 +7,6 @@ const SERVICE_KEY   = import.meta.env.VITE_SUPABASE_SERVICE_KEY
 // Permite cambiar contraseñas de otros usuarios sin requerir que el usuario esté logueado
 export const supabaseAdmin = SERVICE_KEY
   ? createClient(SUPABASE_URL, SERVICE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
+      auth: { autoRefreshToken: false, persistSession: false, storageKey: 'sb-admin-auth-token' },
     })
   : null

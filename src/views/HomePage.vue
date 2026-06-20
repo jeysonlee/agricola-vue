@@ -149,28 +149,32 @@
         <span>Tareas Recientes</span>
       </div>
 
-      <ion-card>
-        <ion-card-content style="padding: 0">
-          <ion-list v-if="recentTareas.length" lines="full">
-            <ion-item
-              v-for="t in recentTareas"
-              :key="t.id"
-              button
-              router-link="/tabs/tareas"
-            >
-              <ion-icon :icon="clipboardOutline" slot="start" :color="statusColor(t.estado)" />
-              <ion-label>
-                <h3>{{ t.tipo_tarea || 'Tarea' }}</h3>
-                <p>{{ t.parcela_nombre }}{{ t.descripcion ? ' — ' + t.descripcion : '' }}</p>
-              </ion-label>
-              <ion-badge :color="statusColor(t.estado)" slot="end">{{ estadoLabel(t.estado) }}</ion-badge>
-            </ion-item>
-          </ion-list>
-          <p v-else class="ion-text-center ion-padding" style="color:var(--ion-color-medium)">
-            Sin tareas recientes
-          </p>
-        </ion-card-content>
-      </ion-card>
+      <div v-if="recentTareas.length" class="list-card">
+        <ion-list lines="none">
+          <ion-item
+            v-for="t in recentTareas"
+            :key="t.id"
+            button
+            detail
+            router-link="/tabs/tareas"
+          >
+            <div slot="start" :class="['item-avatar', `av-${statusColor(t.estado)}`]">
+              <ion-icon :icon="clipboardOutline" />
+            </div>
+            <ion-label>
+              <h3>{{ t.tipo_tarea || 'Tarea' }}</h3>
+              <p>{{ t.parcela_nombre }}</p>
+            </ion-label>
+            <div slot="end" class="item-end">
+              <ion-badge :color="statusColor(t.estado)" class="end-badge">{{ estadoLabel(t.estado) }}</ion-badge>
+            </div>
+          </ion-item>
+        </ion-list>
+      </div>
+      <div v-else class="empty-inline">
+        <ion-icon :icon="clipboardOutline" />
+        <span>Sin tareas recientes</span>
+      </div>
 
     </ion-content>
   </ion-page>
@@ -352,7 +356,45 @@ onMounted(loadData)
 }
 .parcela-meta ion-icon { vertical-align: middle; margin-right: 2px; font-size: 0.9rem; }
 
-/* ── Empty ── */
+/* ── List design (sistema unificado) ── */
+.list-card {
+  margin: 0 0 4px;
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 1px 8px rgba(0,0,0,.08);
+  background: var(--ion-item-background, #fff);
+}
+.list-card ion-list  { padding: 0; background: transparent; }
+.list-card ion-item {
+  --padding-start: 14px; --inner-padding-end: 6px;
+  --min-height: 68px; --background: transparent;
+  --border-color: rgba(0,0,0,.06);
+  --detail-icon-color: var(--ion-color-medium); --detail-icon-font-size: 14px;
+}
+.list-card ion-label h3 { font-size: 15px !important; font-weight: 700 !important; color: var(--ion-color-dark) !important; margin-bottom: 2px !important; }
+.list-card ion-label p  { font-size: 13px !important; color: var(--ion-color-medium-shade) !important; margin: 0 !important; }
+
+.item-avatar {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-right: 4px;
+}
+.item-avatar ion-icon { font-size: 22px; color: #fff; }
+.av-primary  { background: var(--ion-color-primary); }
+.av-warning  { background: #d97706; }
+.av-success  { background: var(--ion-color-success); }
+.av-danger   { background: var(--ion-color-danger); }
+.av-medium   { background: var(--ion-color-medium); }
+
+.item-end   { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.end-badge  { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 700; }
+
+.empty-inline {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 24px; color: var(--ion-color-medium); font-size: 14px;
+}
+.empty-inline ion-icon { font-size: 20px; }
+
+/* ── Empty parcelas ── */
 .empty-state {
   display: flex; flex-direction: column; align-items: center;
   padding: 32px 0; color: var(--ion-color-medium); gap: 8px;

@@ -39,13 +39,13 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const auth = useAuthStore()
 
   if (to.meta.requiresAuth) {
     // Sesión expirada: forzar re-login aunque haya datos en localStorage
     if (auth.sessionExpired) {
-      auth.logout()
+      await auth.logout()
       next('/login')
       return
     }
