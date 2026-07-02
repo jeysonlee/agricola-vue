@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { Preferences } from '@capacitor/preferences'
 
 const SUPABASE_URL      = 'https://gjiieglzvjolrlbkowlf.supabase.co'
-const SUPABASE_ANON_KEY = 'sb_publishable_tiyP8wNKcj6dDxV2DJIzAw_gt5rODzX'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqaWllZ2x6dmpvbHJsYmtvd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwOTU1MTQsImV4cCI6MjA4NDY3MTUxNH0.G9iyHRL-hO3tsfj5el6xBPDgMOur-_ahY8tf68j5vLc'
 
 // En nativo (Android/iOS) usa Capacitor Preferences.
 // En web usa localStorage directamente — evita el prefijo "CapacitorStorage."
