@@ -110,10 +110,7 @@ const eliminando = ref(null)
 const formOpen   = ref(false)
 const selected   = ref(null)
 
-const isSuperadmin = computed(() => {
-  const role = auth.currentUser?.role?.toLowerCase()
-  return role === 'superadmin' || role === 'admin'
-})
+const isSuperadmin = computed(() => auth.isAdmin)
 
 const filtered = computed(() =>
   items.value.filter(i =>
@@ -121,7 +118,7 @@ const filtered = computed(() =>
     i.nombre?.toLowerCase().includes(searchText.value.toLowerCase()) ||
     i.ubicacion?.toLowerCase().includes(searchText.value.toLowerCase()) ||
     i.cultivo?.toLowerCase().includes(searchText.value.toLowerCase())
-  )
+  )  
 )
 
 async function loadData() {

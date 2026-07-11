@@ -6,7 +6,7 @@ export function useAcceso() {
 
   // Returns null for admin/superadmin (all access), or an array of parcela_ids
   async function getParcelaIds() {
-    const role = auth.currentUser?.role?.toLowerCase()
+    const role = auth.currentUser?.role?.trim().toLowerCase()
     if (!role || role === 'admin' || role === 'superadmin') return null
 
     const { getAllPorUsuario } = useParcelas()
@@ -16,7 +16,7 @@ export function useAcceso() {
 
   // Returns all accessible parcelas (objects, not just ids)
   async function getParcelasAccesibles() {
-    const role = auth.currentUser?.role?.toLowerCase()
+    const role = auth.currentUser?.role?.trim().toLowerCase()
     if (!role || role === 'admin' || role === 'superadmin') {
       const { getAll } = useParcelas()
       return getAll()

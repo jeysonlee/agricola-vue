@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(Remove-Item \"c:\\\\xampp\\\\htdocs\\\\agricola-vue\\\\supabase\\\\migration_tareas_cosechas.sql\", \"c:\\\\xampp\\\\htdocs\\\\agricola-vue\\\\supabase\\\\migration_v2_agricola.sql\", \"c:\\\\xampp\\\\htdocs\\\\agricola-vue\\\\supabase\\\\migration_v3_cosechas_ventas.sql\", \"c:\\\\xampp\\\\htdocs\\\\agricola-vue\\\\supabase\\\\migration_v4_rbac_unidad.sql\", \"c:\\\\xampp\\\\htdocs\\\\agricola-vue\\\\supabase\\\\schema.sql\", \"c:\\\\xampp\\\\htdocs\\\\agricola-vue\\\\supabase\\\\seed_tipos_tarea.sql\")",
-      "Bash(npx cap *)"
+      "Bash(npx cap *)",
+      "Bash(npx vue-tsc *)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

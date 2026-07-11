@@ -30,8 +30,15 @@
         <ion-item>
           <ion-icon :icon="mapOutline" slot="start" color="primary" class="item-icon" />
           <ion-label position="stacked">Parcela *</ion-label>
-          <ion-select v-model="form.parcela_id" placeholder="Seleccionar..." interface="action-sheet">
+          <ion-select v-model="form.parcela_id" placeholder="Seleccionar. .." interface="action-sheet">
             <ion-select-option v-for="p in parcelas" :key="p.id" :value="p.id">{{ p.nombre }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item v-if="isAdmin">
+          <ion-icon :icon="personOutline" slot="start" color="primary" class="item-icon" />
+          <ion-label position="stacked">Usuario asociado a la parcela</ion-label>
+          <ion-select v-model="usuarioParcelaId" placeholder="Seleccionar usuario..." interface="action-sheet" :disabled="!form.parcela_id">
+            <ion-select-option v-for="u in usuarios" :key="u.id" :value="u.id">{{ nombreUsuario(u) }}</ion-select-option>
           </ion-select>
         </ion-item>
         <ion-item lines="none">
@@ -405,7 +412,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import AppHeader from '../../components/AppHeader.vue'
@@ -420,7 +427,7 @@ import {
   archiveOutline, peopleOutline, flaskOutline, hammerOutline, chatboxOutline,
   calendarOutline, pricetagOutline, mapOutline, clipboardOutline, documentTextOutline,
   chevronForwardOutline, checkmarkCircleOutline, closeCircleOutline, timeOutline,
-  scaleOutline, settingsOutline,
+  scaleOutline, settingsOutline, personOutline,
 } from 'ionicons/icons'
 import { useTareas } from '../../composables/useTareas'
 import { useParcelas } from '../../composables/useParcelas'
@@ -430,6 +437,9 @@ import { useCostoObreros } from '../../composables/useCostoObreros'
 import { useCostoHerramientas } from '../../composables/useCostoHerramientas'
 import { useCostoInsumos } from '../../composables/useCostoInsumos'
 import { useNotificaciones } from '../../composables/useNotificaciones'
+import { useUsers } from '../../composables/useUsers'
+import { useParcelaUsers } from '../../composables/useParcelaUsers'
+import { useAuthStore } from '../../stores/auth'
 
 const TIPOS_TAREA = ['Poda de formación','Poda sanitaria','Deshierbo/limpieza','Fertilización','Cosecha','Fermentación y secado','Injertación','Control fitosanitario','Otra tarea']
 const TIPOS_INSUMO = [
@@ -464,6 +474,9 @@ const router = useRouter()
 const { getOne, crear, editar } = useTareas()
 const { getAll: getParcelas } = useParcelas()
 const { getParcelasAccesibles } = useAcceso()
+const { getAll: getUsuarios, displayName: nombreUsuario } = useUsers()
+const { porParcela: parcelaUsersPorParcela, crear: crearParcelaUser, editar: editarParcelaUser } = useParcelaUsers()
+const auth = useAuthStore()
 const { crear: crearCosecha, editar: editarCosecha, porTarea: cosechasPorTarea } = useCosechas()
 const { porTarea: mosPorTarea, crear: crearMO, eliminarPorTarea: eliminarMOs } = useCostoObreros()
 const { porTarea: herrPorTarea, crear: crearHerr, eliminarPorTarea: eliminarHerrs } = useCostoHerramientas()
@@ -473,6 +486,13 @@ const { programarAlarmasTarea, cancelarAlarmasTarea } = useNotificaciones()
 const saving   = ref(false)
 const parcelas = ref([])
 const isEdit   = computed(() => !!route.params.id)
+const isAdmin  = computed(() => auth.isAdmin)
+
+// Usuario asociado a la parcela (solo admin/superadmin pueden reasignarlo)
+const usuarios              = ref([])
+const usuarioParcelaId      = ref('')
+const usuarioParcelaOriginal = ref('')
+let asignacionProductorId = null
 
 const form = ref({
   tipo_tarea: '', descripcion: '',
@@ -632,10 +652,27 @@ function calcTotales() {
   totalHerramientas.value = herramientasUsadas.value.reduce((s, r) => s + (+r.subtotal||0), 0)
 }
 
+// ── Usuario asociado a la parcela (admin/superadmin) ─────────────────────────
+
+async function cargarUsuarioParcela(parcelaId) {
+  if (!isAdmin.value || !parcelaId) {
+    usuarioParcelaId.value = ''; usuarioParcelaOriginal.value = ''; asignacionProductorId = null
+    return
+  }
+  const asignaciones = await parcelaUsersPorParcela(parcelaId)
+  const productor = asignaciones.find(a => a.rol === 'productor') || asignaciones[0] || null
+  asignacionProductorId = productor?.id || null
+  usuarioParcelaId.value = productor?.user_id || ''
+  usuarioParcelaOriginal.value = usuarioParcelaId.value
+}
+
+watch(() => form.value.parcela_id, (val) => cargarUsuarioParcela(val))
+
 // ── Carga inicial ─────────────────────────────────────────────────────────────
 
 async function loadData() {
   parcelas.value = await getParcelasAccesibles()
+  if (isAdmin.value) usuarios.value = await getUsuarios()
   if (isEdit.value) {
     const tarea = await getOne(route.params.id)
     if (!tarea) return
@@ -688,6 +725,15 @@ async function guardar() {
     } else {
       const res = await crear(data)
       tareaId = res.id
+    }
+
+    // Usuario asociado a la parcela (solo admin/superadmin, si cambió)
+    if (isAdmin.value && usuarioParcelaId.value && usuarioParcelaId.value !== usuarioParcelaOriginal.value) {
+      if (asignacionProductorId) {
+        await editarParcelaUser(asignacionProductorId, { user_id: usuarioParcelaId.value })
+      } else {
+        await crearParcelaUser({ parcela_id: form.value.parcela_id, user_id: usuarioParcelaId.value, rol: 'productor' })
+      }
     }
 
     // Costos en tablas separadas

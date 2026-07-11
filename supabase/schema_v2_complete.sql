@@ -1,4 +1,4 @@
--- ================================================================
+  -- ================================================================
 -- SCHEMA AGRÍCOLA V2 — COMPLETO
 -- Ejecutar en Supabase SQL Editor
 -- IMPORTANTE: Elimina el modelo anterior y crea el nuevo.
@@ -15,15 +15,7 @@ DROP TABLE IF EXISTS ventas                 CASCADE;
 DROP TABLE IF EXISTS cosechas               CASCADE;
 DROP TABLE IF EXISTS costo_insumos          CASCADE;
 DROP TABLE IF EXISTS costo_herramientas     CASCADE;
-DROP TABLE IF EXISTS costo_obreros          CASCADE;
-DROP TABLE IF EXISTS tareas                 CASCADE;
-DROP TABLE IF EXISTS insumo_movimientos     CASCADE;
-DROP TABLE IF EXISTS insumos                CASCADE;
-DROP TABLE IF EXISTS herramientas           CASCADE;
-DROP TABLE IF EXISTS tipos_tarea            CASCADE;
-DROP TABLE IF EXISTS obreros                CASCADE;
-DROP TABLE IF EXISTS parcela_users          CASCADE;
-DROP TABLE IF EXISTS parcelas               CASCADE;
+DROP TABLE IF EXISTS costo_obreros          CASCADE; 
 
 DROP VIEW IF EXISTS reporte_ingresos_parcela;
 DROP VIEW IF EXISTS reporte_egresos_parcela;

@@ -16,7 +16,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!currentUser.value)
   const userRole        = computed(() => currentUser.value?.role || null)
   const isAdmin         = computed(() => {
-    const role = currentUser.value?.role?.toLowerCase()
+    const role = currentUser.value?.role?.trim().toLowerCase()
     return role === 'admin' || role === 'superadmin'
   })
 

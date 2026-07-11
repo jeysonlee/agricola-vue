@@ -20,9 +20,9 @@
     <ion-content class="ion-padding">
       <ion-list>
 
-        <!-- Solo visible para superadmin / admin al crear -->
-        <ion-item v-if="isSuperadmin && !isEdit">
-          <ion-label position="stacked">Asignar a usuario *</ion-label>
+        <!-- Solo visible para superadmin / admin -->
+        <ion-item v-if="isSuperadmin" lines="full">
+          <ion-label position="stacked">Usuario asignado (productor) *</ion-label>
           <ion-select v-model="usuarioId" placeholder="Seleccionar productor..." interface="action-sheet">
             <ion-select-option v-for="u in usuarios" :key="u.id" :value="u.id">
               {{ nombreUsuario(u) }}
@@ -64,6 +64,7 @@ import {
 } from '@ionic/vue'
 import { closeOutline, checkmarkOutline } from 'ionicons/icons'
 import { useParcelas } from '../../composables/useParcelas'
+import { useParcelaUsers } from '../../composables/useParcelaUsers'
 
 const props = defineProps({
   parcela:      { type: Object,  default: null },
@@ -74,25 +75,43 @@ const props = defineProps({
 const emit = defineEmits(['saved', 'cancel'])
 
 const { crearConUsuario, editar } = useParcelas()
+const { porParcela: parcelaUsersPorParcela, crear: crearParcelaUser, editar: editarParcelaUser } = useParcelaUsers()
 const saving    = ref(false)
 const isEdit    = computed(() => !!props.parcela)
 const usuarioId = ref(props.currentUserId)
+
+// Usuario actualmente asignado en parcela_users (para saber si cambió al guardar)
+const usuarioIdOriginal = ref('')
+let asignacionProductorId = null
 
 const form = ref({ nombre: '', ubicacion: '', area: '', cultivo: '', descripcion: '' })
 
 const isFormValid = computed(() => {
   if (!form.value.nombre?.trim()) return false
-  if (props.isSuperadmin && !isEdit.value && !usuarioId.value) return false
+  if (props.isSuperadmin && !usuarioId.value) return false
   return true
 })
 
-watch(() => props.parcela, (val) => {
+watch(() => props.parcela, async (val) => {
   form.value = val
     ? { nombre: val.nombre || '', ubicacion: val.ubicacion || '', area: val.area || '', cultivo: val.cultivo || '', descripcion: val.descripcion || '' }
     : { nombre: '', ubicacion: '', area: '', cultivo: '', descripcion: '' }
+
+  if (val) {
+    // Cargar el usuario (productor) realmente asignado a esta parcela
+    const asignaciones = await parcelaUsersPorParcela(val.id)
+    const productor = asignaciones.find(a => a.rol === 'productor') || asignaciones[0] || null
+    asignacionProductorId    = productor?.id || null
+    usuarioId.value          = productor?.user_id || ''
+    usuarioIdOriginal.value  = usuarioId.value
+  } else {
+    asignacionProductorId   = null
+    usuarioIdOriginal.value = ''
+  }
 }, { immediate: true })
 
-watch(() => props.currentUserId, (val) => { usuarioId.value = val }, { immediate: true })
+// Solo aplica el usuario logueado como valor por defecto al CREAR (nunca pisa el dueño real en edición)
+watch(() => props.currentUserId, (val) => { if (!isEdit.value) usuarioId.value = val }, { immediate: true })
 
 function nombreUsuario(u) {
   const full = [u.first_name, u.last_name].filter(Boolean).join(' ')
@@ -114,6 +133,14 @@ async function guardar() {
 
     if (isEdit.value) {
       await editar(props.parcela.id, data)
+      // Reasignar usuario solo si superadmin/admin lo cambió; si no cambió, se deja igual
+      if (props.isSuperadmin && usuarioId.value && usuarioId.value !== usuarioIdOriginal.value) {
+        if (asignacionProductorId) {
+          await editarParcelaUser(asignacionProductorId, { user_id: usuarioId.value })
+        } else {
+          await crearParcelaUser({ parcela_id: props.parcela.id, user_id: usuarioId.value, rol: 'productor' })
+        }
+      }
     } else {
       const userId = props.isSuperadmin ? usuarioId.value : props.currentUserId
       await crearConUsuario(data, userId, 'productor')
