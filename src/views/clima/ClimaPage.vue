@@ -135,6 +135,12 @@
           </div>
         </div>
 
+        <!-- ── AVISO LLUVIA MAÑANA (horas de labor, antes de 7pm) ─────────── -->
+        <div v-if="avisoLluviaManana" class="lluvia-alerta-banner">
+          <span class="lluvia-alerta-emoji">🌧️</span>
+          <p>{{ avisoLluviaManana.mensaje }}</p>
+        </div>
+
         <!-- ── AVISOS DEL DÍA ──────────────────────────────────────────────── -->
         <div class="section-header">
           <ion-icon :icon="notificationsOutline" color="warning" />
@@ -218,14 +224,14 @@
             <div :class="['dia-franja', `franja-${avisosPronostico[i]?.color || 'medium'}`]"></div>
 
             <!-- Emoji condición (grande) -->
-            <span class="dia-icono">{{ condicionEmoji(d.weather?.[0]?.id) }}</span>
+            <span class="dia-icono">{{ iconoDia(d, i) }}</span>
 
             <!-- Texto central -->
             <div class="dia-texto">
               <div class="dia-nombre-row">
                 <span class="dia-nombre">{{ i === 0 ? 'Hoy' : i === 1 ? 'Mañana' : fmtDia(d.dt) }}</span>
                 <!-- Badge de lluvia o soleado -->
-                <span :class="['dia-prob-badge', probClase(d)]">{{ textoProb(d) }}</span>
+                <span :class="['dia-prob-badge', probClase(avisosPronostico[i])]">{{ textoProb(avisosPronostico[i], diasAjustados[i]) }}</span>
               </div>
               <span class="dia-tip">{{ avisosPronostico[i]?.resumen?.split('.')[0] ?? capitalize(d.weather?.[0]?.description) }}</span>
             </div>
@@ -252,7 +258,7 @@
               <span class="hora-time">{{ fmtHoraCorta(h.dt) }}</span>
               <span class="hora-emoji">{{ condicionEmoji(h.weather?.[0]?.id) }}</span>
               <span class="hora-temp">{{ Math.round(h.temp) }}°</span>
-              <span v-if="(h.pop ?? 0) > 0.1" class="hora-lluvia">{{ Math.round(h.pop * 100) }}%</span>
+              <span v-if="(h.pop ?? 0) > 0.1" class="hora-lluvia">💧 {{ Math.round(h.pop * 100) }}% lluvia</span>
             </div>
           </div>
         </div>
@@ -338,7 +344,7 @@
         </div>
 
         <!-- Probabilidad de lluvia prominente -->
-        <div class="prob-banner" :class="`prob-${probClase(diaDetalle)}`">
+        <div class="prob-banner" :class="probClase(avisoDetalle)">
           <span class="prob-num">{{ Math.round((diaDetalle.pop ?? 0) * 100) }}%</span>
           <span class="prob-lbl">probabilidad de lluvia</span>
           <div class="prob-bar">
@@ -349,7 +355,7 @@
         <!-- Métricas del día -->
         <div class="detalle-grid">
           <div class="detalle-stat">
-            <span class="ds-icon">🌡️</span>
+            <span class="ds-icon">{{ avisoDetalle.emoji }}</span>
             <span class="ds-val">{{ Math.round(diaDetalle.temp?.max) }}° / {{ Math.round(diaDetalle.temp?.min) }}°</span>
             <small>Máx / Mín</small>
           </div>
@@ -418,7 +424,7 @@ import {
 } from 'ionicons/icons'
 import { Network } from '@capacitor/network'
 import AppHeader        from '../../components/AppHeader.vue'
-import { useClima, condicionEmoji, generarAvisoDia } from '../../composables/useClima'
+import { useClima, condicionEmoji, generarAvisoDia, pronosticoLluviaManana } from '../../composables/useClima'
 import { useClimaStore } from '../../stores/clima'
 import { useTareas }     from '../../composables/useTareas'
 import { useAcceso }     from '../../composables/useAcceso'
@@ -467,20 +473,59 @@ async function cargarTareas() {
 }
 
 // ── Avisos ────────────────────────────────────────────────────────────────────
-const avisoHoy         = computed(() => pronostico.value[0] ? generarAvisoDia(pronostico.value[0]) : null)
-const avisoManana      = computed(() => pronostico.value[1] ? generarAvisoDia(pronostico.value[1]) : null)
-const avisosPronostico = computed(() => pronostico.value.map(d => generarAvisoDia(d)))
+// Probabilidad de lluvia restringida a horario laboral (00:00-19:00) para un día
+// dado, usando el pronóstico horario cuando está disponible (hoy/mañana). Sin
+// datos horarios para ese día, devuelve null y se usa el pop diario de la API.
+function popEnHorarioLaboral(diaDt, horasArr) {
+  if (!horasArr?.length) return null
+  const fechaStr = new Date(diaDt * 1000).toDateString()
+  const horasDia = horasArr.filter(h => {
+    const f = new Date(h.dt * 1000)
+    return f.toDateString() === fechaStr && f.getHours() < 19
+  })
+  if (!horasDia.length) return null
+  return Math.max(...horasDia.map(h => h.pop ?? 0))
+}
+
+// Días del pronóstico con el pop ajustado a horario laboral cuando hay datos
+// horarios disponibles; el resto conserva el pop diario tal como lo da la API.
+// Esto evita que el badge, el resumen y el detalle de un mismo día se contradigan.
+const diasAjustados = computed(() => pronostico.value.map(d => {
+  const popLaboral = popEnHorarioLaboral(d.dt, horas.value)
+  return popLaboral != null ? { ...d, pop: popLaboral } : d
+}))
+
+// "Hoy" usa la condición ACTUAL (misma fuente que el ícono del hero) en vez del
+// resumen diario, para que el ícono grande y el texto de aviso nunca se contradigan.
+const avisoHoy = computed(() => {
+  if (!diasAjustados.value[0]) return null
+  const base = diasAjustados.value[0]
+  if (actual.value?.weather?.length) return generarAvisoDia({ ...base, weather: actual.value.weather })
+  return generarAvisoDia(base)
+})
+const avisoManana      = computed(() => diasAjustados.value[1] ? generarAvisoDia(diasAjustados.value[1]) : null)
+const avisosPronostico = computed(() => diasAjustados.value.map((d, i) => i === 0 ? avisoHoy.value : generarAvisoDia(d)))
+
+// Aviso de lluvia probable mañana, solo si ocurre en horas de labor (antes de 7pm)
+const avisoLluviaManana = computed(() => {
+  const r = pronosticoLluviaManana(horas.value)
+  if (!r) return null
+  return {
+    ...r,
+    mensaje: `Mañana hay pronóstico de lluvia (${Math.round(r.popMax * 100)}%), con mayor probabilidad cerca de las ${fmtHoraCorta(r.horaPico)}. Planifique sus labores de campo antes de esa hora.`,
+  }
+})
 
 const tareasEnRiesgo = computed(() => {
   const result = []
-  for (const dia of pronostico.value) {
-    const aviso = generarAvisoDia(dia)
-    if (!aviso?.urgente) continue
+  diasAjustados.value.forEach((dia, i) => {
+    const aviso = avisosPronostico.value[i]
+    if (!aviso?.urgente) return
     const fechaStr = dtToDateStr(dia.dt)
     for (const tarea of tareasPendientes.value) {
       if (tarea.fecha_programada === fechaStr) result.push({ tarea, aviso, fechaStr })
     }
-  }
+  })
   return result
 })
 
@@ -494,9 +539,12 @@ function dtToDateStr(unix) { return new Date(unix * 1000).toISOString().split('T
 // ── Detalle de día ────────────────────────────────────────────────────────────
 const diaDetalle    = ref(null)
 const diaDetalleIdx = ref(0)
-const avisoDetalle  = computed(() => diaDetalle.value ? generarAvisoDia(diaDetalle.value) : null)
+const avisoDetalle  = computed(() => {
+  if (!diaDetalle.value) return null
+  return diaDetalleIdx.value === 0 ? avisoHoy.value : generarAvisoDia(diaDetalle.value)
+})
 
-function abrirDetalle(dia, idx) { diaDetalle.value = dia; diaDetalleIdx.value = idx }
+function abrirDetalle(dia, idx) { diaDetalle.value = diasAjustados.value[idx]; diaDetalleIdx.value = idx }
 
 // ── Buscador ──────────────────────────────────────────────────────────────────
 const queryBusqueda = ref('')
@@ -569,25 +617,35 @@ const heroClass = computed(() => {
   return 'hero-nublado'
 })
 
-// Texto de probabilidad de lluvia/sol para la fila de día
-function textoProb(dia) {
-  const pop = dia.pop ?? 0
-  const id  = dia.weather?.[0]?.id ?? 800
-  if (id >= 200 && id < 300) return `⛈ ${Math.round(pop * 100)}%`
-  if (id >= 300 && id < 600) return `🌧 ${Math.round(pop * 100)}%`
-  if (pop >= 0.1)             return `💧 ${Math.round(pop * 100)}%`
-  if (id === 800)             return '☀️ Soleado'
-  if (id <= 802)              return '🌤 Poco nublado'
-  return '☁️ Nublado'
+// Badge y color de cada fila: se derivan del MISMO aviso (generarAvisoDia) que
+// el resumen de texto, para que nunca digan cosas distintas sobre el mismo día.
+// Si no va a llover, indica sol/nublado; si sí, muestra qué tan probable es.
+function textoProb(aviso, dia) {
+  if (!aviso) return ''
+  const pop = Math.round((dia?.pop ?? 0) * 100)
+  switch (aviso.tipo) {
+    case 'tormenta':       return `⛈ ${pop}% lluvia`
+    case 'llovizna':       return `🌦 ${pop}% lluvia`
+    case 'lluvia':         return `🌧 ${pop}% lluvia`
+    case 'posible-lluvia': return `🌦 ${pop}% lluvia`
+    case 'helada':         return '❄️ Helada'
+    case 'calor':          return '🌡️ Calor'
+    case 'frio':           return '🥶 Frío'
+    case 'neblina':        return '🌫 Neblina'
+    case 'soleado':        return '☀️ Soleado'
+    default:                return pop >= 10 ? `☁️ ${pop}% lluvia` : '☁️ Nublado'
+  }
 }
 
-function probClase(dia) {
-  const pop = dia.pop ?? 0
-  const id  = dia.weather?.[0]?.id ?? 800
-  if (id >= 200 && id < 300 || pop > 0.6) return 'prob-danger'
-  if (pop > 0.3)  return 'prob-warning'
-  if (id === 800) return 'prob-success'
-  return 'prob-medium'
+function probClase(aviso) {
+  return aviso ? `prob-${aviso.color}` : 'prob-medium'
+}
+
+// Ícono de la fila: "Hoy" usa la condición actual (misma fuente que el hero);
+// el resto usa la condición diaria ajustada, igual que su aviso.
+function iconoDia(dia, i) {
+  const id = (i === 0 && actual.value?.weather?.length) ? actual.value.weather[0].id : dia.weather?.[0]?.id
+  return condicionEmoji(id)
 }
 
 function colorClaseDia(aviso) {
@@ -680,6 +738,17 @@ function capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(
   padding: 18px 16px 8px; font-size: 12px; font-weight: 700;
   color: var(--ion-color-dark); text-transform: uppercase; letter-spacing: .6px;
 }
+
+/* ══ AVISO LLUVIA MAÑANA ══════════════════════════════════════════════════════ */
+.lluvia-alerta-banner {
+  display: flex; align-items: center; gap: 10px;
+  margin: 10px 12px 0; padding: 12px 14px;
+  background: rgba(var(--ion-color-warning-rgb), .15);
+  border-left: 4px solid var(--ion-color-warning);
+  border-radius: 10px;
+}
+.lluvia-alerta-emoji { font-size: 26px; flex-shrink: 0; }
+.lluvia-alerta-banner p { margin: 0; font-size: 13px; color: var(--ion-color-dark); line-height: 1.4; }
 
 /* ══ AVISOS ═══════════════════════════════════════════════════════════════════ */
 .avisos-wrap { padding: 0 12px 8px; display: flex; flex-direction: column; gap: 10px; }

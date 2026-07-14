@@ -81,6 +81,13 @@ export function generarAvisoDia(dia) {
       buenoPara: ['Poda', 'Mantenimiento de infraestructura'],
       maloPara:  ['Trasplante de plántulas', 'Riego nocturno'],
     }
+    if (pop > 0.3) return {
+      tipo: 'posible-lluvia', emoji: '🌦️', color: 'warning', urgente: pop > 0.5,
+      titulo:    `Posible lluvia aislada · ${Math.round(pop * 100)}% · ${Math.round(tMax)}°C`,
+      resumen:   'Cielo mayormente despejado pero con probabilidad de lluvia aislada. Monitoree el cielo antes de fumigar.',
+      buenoPara: ['Siembra', 'Trasplante', 'Labores generales'],
+      maloPara:  ['Fumigación sin supervisión'],
+    }
     return {
       tipo: 'soleado', emoji: '☀️', color: 'success', urgente: false,
       titulo:    viento > 8 ? `Soleado con viento · ${Math.round(tMax)}°C` : `Soleado · ${Math.round(tMax)}°C`,
@@ -105,6 +112,34 @@ export function generarAvisoDia(dia) {
     buenoPara: ['Trasplante', 'Siembra', 'Labores generales'],
     maloPara:  pop > 0.35 ? ['Fumigación', 'Cosecha mecanizada'] : [],
   }
+}
+
+/**
+ * Revisa el pronóstico horario y determina si hay probabilidad relevante de
+ * lluvia mañana durante horas de labor (00:00–19:00). Después de las 7pm no
+ * importa porque las labores de campo ya terminaron por el día.
+ * @param {Array} horas  - Pronóstico horario (cada item con .dt en unix segundos y .pop)
+ * @param {number} umbral - Probabilidad mínima (0-1) para considerarlo relevante
+ * @returns {{ popMax:number, horaPico:number } | null}
+ */
+export function pronosticoLluviaManana(horas = [], umbral = 0.3) {
+  if (!horas.length) return null
+
+  const manana    = new Date()
+  manana.setDate(manana.getDate() + 1)
+  const mananaStr = manana.toDateString()
+
+  const horasLaborables = horas.filter(h => {
+    const fecha = new Date(h.dt * 1000)
+    return fecha.toDateString() === mananaStr && fecha.getHours() < 19
+  })
+  if (!horasLaborables.length) return null
+
+  const pico   = horasLaborables.reduce((max, h) => (h.pop ?? 0) > (max.pop ?? 0) ? h : max, horasLaborables[0])
+  const popMax = pico.pop ?? 0
+  if (popMax < umbral) return null
+
+  return { popMax, horaPico: pico.dt }
 }
 
 export function condicionEmoji(id) {
