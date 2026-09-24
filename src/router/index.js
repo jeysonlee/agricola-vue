@@ -14,6 +14,11 @@ const routes = [
     },
   },
   {
+    path: '/tickets',
+    name: 'TicketsLibre',
+    component: () => import('../views/tickets/TicketsPage.vue'),
+  },
+  {
     path: '/tabs/',
     component: () => import('../views/TabsPage.vue'),
     meta: { requiresAuth: true },

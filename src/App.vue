@@ -133,8 +133,10 @@ async function verificarTareasAlInicio() {
 watch(() => auth.isAuthenticated, (val) => { if (val) verificarTareasAlInicio() }, { immediate: true })
 
 onMounted(async () => {
-  // 1. Restaurar sesión y verificar expiración (12h)
-  const sesionValida = await auth.restoreSession()
+if (route.path === '/tickets' || route.path.startsWith('/tickets/')) return
+
+// 1. Restaurar sesión y verificar expiración (12h)
+const sesionValida = await auth.restoreSession()
 
   if (!sesionValida) {
     // Sesión expirada o inválida → el router guard redirige a /login
