@@ -487,8 +487,8 @@ async function handleExportTickets(tickets, fileName = 'tickets-promocionales.pd
   }
 
   await exportTicketPdfDocument(tickets, fileName, {
-    widthMm: 80,
-    ticketHeightMm: 62,
+    widthMm: 72,
+    ticketHeightMm: 80,
     title: 'SIEMBRA Y GANA',
     subtitle: 'Campaña de promoción',
     formatDate,

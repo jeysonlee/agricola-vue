@@ -5,6 +5,16 @@ function defaultFormatDate(value) {
   return new Date(value).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+function drawWrappedText(pdf, text, x, y, maxWidth, lineHeight = 4, maxLines = 2) {
+  const value = String(text || '')
+  if (!value) return
+
+  const lines = pdf.splitTextToSize(value, maxWidth).slice(0, maxLines)
+  lines.forEach((line, index) => {
+    pdf.text(line, x, y + index * lineHeight)
+  })
+}
+
 function drawTicket(pdf, ticket, y, config) {
   const {
     widthMm,
@@ -17,73 +27,78 @@ function drawTicket(pdf, ticket, y, config) {
     fieldStyles = {},
   } = config
 
-  pdf.addImage(logo, 'JPEG', 3, y, 22, 22)
+  pdf.addImage(logo, 'JPEG', 3, y, 20, 20)
 
   const subtitleStyle = fieldStyles.subtitle || { font: 'times', weight: 'bold', size: 8 }
   pdf.setFont(subtitleStyle.font, subtitleStyle.weight)
   pdf.setFontSize(subtitleStyle.size)
   pdf.setTextColor(0, 0, 0)
-  pdf.text(String(subtitle), 33, y + 6)
+  pdf.text(String(subtitle), 27, y + 6)
 
   const titleStyle = fieldStyles.title || { font: 'times', weight: 'bold', size: 10 }
   pdf.setFont(titleStyle.font, titleStyle.weight)
   pdf.setFontSize(titleStyle.size)
   pdf.setTextColor(0, 0, 0)
-  pdf.text(String(title), 33, y + 12)
+  pdf.text(String(title), 27, y + 12)
 
   const ticketStyle = fieldStyles.ticket || { font: 'times', weight: 'bold', size: 11 }
   pdf.setFont(ticketStyle.font, ticketStyle.weight)
   pdf.setFontSize(ticketStyle.size)
-  pdf.text(`TICKET N.° ${ticket.numero}`, 28, y + 24)
+  pdf.text(`TICKET N.° ${ticket.numero}`, 24, y + 24)
+
+  const clientLines = pdf.splitTextToSize(ticket.nombre || '', 45).slice(0, 2)
+  const clientOffset = clientLines.length > 1 ? 4 : 0
 
   pdf.setFont('times', 'bold')
   pdf.setFontSize(9)
   pdf.text('Cliente:', 4, y + 30)
   pdf.setFont('times', 'normal')
   pdf.setFontSize(9)
-  pdf.text(ticket.nombre || '', 17, y + 30)
+  clientLines.forEach((line, index) => {
+    pdf.text(line, 17, y + 30 + index * 4)
+  })
+
+  const infoY = y + 34 + clientOffset
 
   pdf.setFont('times', 'normal')
   pdf.setFontSize(9)
-  pdf.text('DNI:', 4, y + 34)
+  pdf.text('DNI:', 4, infoY)
   pdf.setFont('times', 'normal')
   pdf.setFontSize(9)
-  pdf.text(ticket.dni || '', 12, y + 34)
+  pdf.text(ticket.dni || '', 12, infoY)
 
   pdf.setFont('times', 'normal')
   pdf.setFontSize(9)
-  pdf.text('Teléfono:', 45, y + 34)
+  pdf.text('Teléfono:', 37, infoY)
   pdf.setFont('times', 'bold')
   pdf.setFontSize(9)
-  pdf.text(ticket.telefono || '', 59, y + 34)
+  pdf.text(ticket.telefono || '', 50, infoY)
 
-  pdf.setFont('times', 'normal')
-  pdf.setFontSize(9)
-  pdf.text('Compra:', 4, y + 39)
-  pdf.setFont('times', 'bold')
-  pdf.setFontSize(11)
-  pdf.text(`S/ ${Number(ticket.monto || 0).toFixed(2)}`, 20, y + 39)
-
-  pdf.setFont('times', 'normal')
-  pdf.setFontSize(6.7)
-  pdf.text('HASH:', 4, y + 45)
-  pdf.setFont('times', 'normal')
-  pdf.setFontSize(6.4)
-  pdf.text(ticket.hash || '', 12, y + 45)
+  const hashY = infoY + 5
 
   pdf.setFont('times', 'normal')
   pdf.setFontSize(7)
-  pdf.text('Fecha:', 45, y + 45)
+  pdf.text('HASH:', 4, hashY)
+  pdf.setFont('times', 'normal')
+  pdf.setFontSize(7)
+  pdf.text(ticket.hash || '', 12, hashY)
+
+  pdf.setFont('times', 'normal')
+  pdf.setFontSize(7)
+  pdf.text('Fecha:', 37, hashY)
   pdf.setFont('times', 'normal')
   pdf.setFontSize(6.8)
-  pdf.text(formatDate(ticket.createdAt), 55, y + 45)
+  pdf.text(formatDate(ticket.createdAt), 47, hashY)
+
+  const footerY = hashY + 6
 
   pdf.setFont('times', 'bold')
   pdf.setFontSize(10)
-  pdf.text('Conserve este ticket', 25, y + 54)
+  pdf.text('Conserve este ticket', 25, footerY)
 
+  const dividerY = footerY + 15
   pdf.setDrawColor(80, 80, 80)
-  pdf.line(0, y+58, 80, y+58) // línea divisoria
+  pdf.line(0, dividerY, widthMm, dividerY) // línea divisoria con ancho real del ticket
 }
 
 export function exportTicketsToPdf(tickets, fileName = 'tickets-promocionales.pdf', options = {}) {
@@ -92,8 +107,8 @@ export function exportTicketsToPdf(tickets, fileName = 'tickets-promocionales.pd
   const {
     logoSrc = '/graniti_logo.jpeg',
     formatDate = defaultFormatDate,
-    widthMm = 80,
-    ticketHeightMm = 62,
+    widthMm = 72,
+    ticketHeightMm = 80,
     marginLeftMm = 2,
     title = 'SIEMBRA Y GANA',
     subtitle = 'Campaña de promoción',
@@ -142,7 +157,7 @@ export function exportTicketsToPdf(tickets, fileName = 'tickets-promocionales.pd
 }
 
 export const jsPdfKeys = {
-  widthMm: 'ancho fijo del documento (80 mm)',
+  widthMm: 'ancho fijo del documento (72 mm)',
   ticketHeightMm: 'altura de cada ticket',
   title: 'texto principal del encabezado',
   subtitle: 'texto secundario del encabezado',
