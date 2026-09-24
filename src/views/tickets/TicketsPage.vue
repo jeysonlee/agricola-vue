@@ -8,10 +8,19 @@
         </div>
 
         <div class="topbar-actions">
-          <button type="button" class="action-button pdf" :disabled="!selectedSale" @click="selectedSale && downloadSalePdf(selectedSale)">PDF</button>
-          <button type="button" class="action-button edit" :disabled="!selectedSale" @click="selectedSale && openForm(selectedSale)">Editar</button>
-          <button type="button" class="action-button danger" :disabled="!selectedSale" @click="selectedSale && confirmDelete(selectedSale)">Eliminar</button>
-          <button class="primary-button" type="button" @click="openForm(null)">+ Nuevo</button>
+          <button type="button" class="action-button pdf" :disabled="!selectedSale || isExporting || isDeleting || isSaving" @click="selectedSale && downloadSalePdf(selectedSale)">
+            <span v-if="isExporting" class="mini-spinner" aria-hidden="true"></span>
+            {{ isExporting ? 'PDF...' : 'PDF' }}
+          </button>
+          <button type="button" class="action-button edit" :disabled="!selectedSale || isExporting || isDeleting || isSaving" @click="selectedSale && openForm(selectedSale)">Editar</button>
+          <button type="button" class="action-button danger" :disabled="!selectedSale || isExporting || isDeleting || isSaving" @click="selectedSale && confirmDelete(selectedSale)">
+            <span v-if="isDeleting" class="mini-spinner danger" aria-hidden="true"></span>
+            {{ isDeleting ? 'Eliminando...' : 'Eliminar' }}
+          </button>
+          <button class="primary-button" type="button" :disabled="isSaving || isDeleting || isExporting || isLoadingSales" @click="openForm(null)">
+            <span v-if="isSaving" class="mini-spinner" aria-hidden="true"></span>
+            {{ isSaving ? 'Guardando...' : '+ Nuevo' }}
+          </button>
         </div>
       </header>
 
@@ -122,11 +131,19 @@ const TICKETS_TABLE = 'promotional_tickets'
 const sales = ref([])
 const loading = ref(false)
 const saving = ref(false)
+const deleting = ref(false)
+const exporting = ref(false)
+const loadingSales = ref(false)
 const showForm = ref(false)
 const selectedSale = ref(null)
 const selectedSaleId = ref(null)
 const searchText = ref('')
 const printingTickets = ref([])
+
+const isSaving = computed(() => saving.value)
+const isDeleting = computed(() => deleting.value)
+const isExporting = computed(() => exporting.value)
+const isLoadingSales = computed(() => loadingSales.value)
 
 const filteredSales = computed(() => {
   const query = searchText.value.trim().toLowerCase()
@@ -242,6 +259,7 @@ function makeId() {
 }
 
 async function loadSales() {
+  loadingSales.value = true
   loading.value = true
   try {
     const { data, error } = await supabase
@@ -255,6 +273,7 @@ async function loadSales() {
     console.error('[Tickets] Error al cargar ventas:', error)
     sales.value = []
   } finally {
+    loadingSales.value = false
     loading.value = false
   }
 }
@@ -404,6 +423,7 @@ async function confirmDelete(sale) {
   const confirmed = window.confirm(`¿Deseas eliminar este ticket y su registro de venta?`)
   if (!confirmed) return
 
+  deleting.value = true
   try {
     const { error: ticketError } = await supabase.from(TICKETS_TABLE).delete().eq('sale_id', sale.id)
     if (ticketError) throw ticketError
@@ -412,38 +432,48 @@ async function confirmDelete(sale) {
     if (error) throw error
 
     sales.value = sales.value.filter((item) => item.id !== sale.id)
+    if (selectedSaleId.value === sale.id) {
+      closeForm()
+    }
   } catch (error) {
     console.error('[Tickets] Error al eliminar:', error)
     alert('No se pudo eliminar el ticket.')
+  } finally {
+    deleting.value = false
   }
 }
 
 async function printSale(sale) {
-  const { data, error } = await supabase
-    .from(TICKETS_TABLE)
-    .select('*')
-    .eq('sale_id', sale.id)
-    .order('numero', { ascending: true })
+  exporting.value = true
+  try {
+    const { data, error } = await supabase
+      .from(TICKETS_TABLE)
+      .select('*')
+      .eq('sale_id', sale.id)
+      .order('numero', { ascending: true })
 
-  if (error) {
-    console.error('[Tickets] Error al cargar tickets:', error)
-    alert('No se pudo cargar el ticket para imprimir.')
-    return
+    if (error) {
+      console.error('[Tickets] Error al cargar tickets:', error)
+      alert('No se pudo cargar el ticket para imprimir.')
+      return
+    }
+
+    const saleTickets = (data || []).map((ticket) => ({
+      id: ticket.id,
+      numero: ticket.numero,
+      hash: ticket.hash_code,
+      nombre: ticket.cliente_nombre,
+      dni: ticket.dni,
+      telefono: ticket.telefono,
+      monto: Number(ticket.monto_compra || 0),
+      productoEspecial: !!ticket.producto_especial,
+      createdAt: ticket.created_at,
+    }))
+
+    await handleExportTickets(saleTickets, `tickets-${sale.id}.pdf`)
+  } finally {
+    exporting.value = false
   }
-
-  const saleTickets = (data || []).map((ticket) => ({
-    id: ticket.id,
-    numero: ticket.numero,
-    hash: ticket.hash_code,
-    nombre: ticket.cliente_nombre,
-    dni: ticket.dni,
-    telefono: ticket.telefono,
-    monto: Number(ticket.monto_compra || 0),
-    productoEspecial: !!ticket.producto_especial,
-    createdAt: ticket.created_at,
-  }))
-
-  await handleExportTickets(saleTickets, `tickets-${sale.id}.pdf`)
 }
 
 async function downloadSalePdf(sale) {
@@ -542,6 +572,16 @@ h2 {
   padding: 12px 18px;
   cursor: pointer;
   box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.primary-button:disabled,
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .action-button {
@@ -552,11 +592,31 @@ h2 {
   cursor: pointer;
   color: var(--ticket-text);
   background: var(--ticket-card-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.action-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.mini-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: rgba(255, 255, 255, 1);
+  border-radius: 50%;
+  display: inline-block;
+  animation: ticket-spin 0.8s linear infinite;
+}
+
+.mini-spinner.danger {
+  border-color: rgba(239, 68, 68, 0.45);
+  border-top-color: rgba(239, 68, 68, 1);
+}
+
+@keyframes ticket-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .action-button.pdf {

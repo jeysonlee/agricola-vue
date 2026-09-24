@@ -9,17 +9,20 @@
       <div class="field-grid">
         <label class="field">
           <span>Nombre completo</span>
-          <input v-model.trim="form.nombre" type="text" placeholder="Nombres y apellidos" required />
+          <input v-model="form.nombre" type="text" placeholder="Nombres y apellidos" maxlength="80" required />
+          <small v-if="validation.nombre" class="field-error">{{ validation.nombre }}</small>
         </label>
 
         <label class="field">
           <span>DNI</span>
-          <input v-model.trim="form.dni" type="text" placeholder="12345678" maxlength="8" required />
+          <input v-model="form.dni" type="text" inputmode="numeric" placeholder="12345678" maxlength="8" required />
+          <small v-if="validation.dni" class="field-error">{{ validation.dni }}</small>
         </label>
 
         <label class="field">
           <span>Teléfono</span>
-          <input v-model.trim="form.telefono" type="tel" placeholder="999 999 999" required />
+          <input v-model="form.telefono" type="tel" inputmode="numeric" placeholder="999 999 999" maxlength="9" required />
+          <small v-if="validation.telefono" class="field-error">{{ validation.telefono }}</small>
         </label>
 
         <label class="field">
@@ -41,8 +44,9 @@
       </div>
 
       <div class="actions">
-        <button type="button" class="btn secondary" @click="$emit('cancel')">Cancelar</button>
+        <button type="button" class="btn secondary" @click="$emit('cancel')" :disabled="saving">Cancelar</button>
         <button type="submit" class="btn primary" :disabled="saving || !canSubmit">
+          <span v-if="saving" class="btn-spinner" aria-hidden="true"></span>
           {{ saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear ticket' }}
         </button>
       </div>
@@ -75,10 +79,46 @@ const form = reactive({
   productoEspecial: false,
 })
 
+const validateName = (value = '') => {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return 'Ingrese un nombre válido'
+  if (trimmed.length < 2) return 'Ingrese un nombre válido'
+  if (/\d/.test(trimmed)) return 'El nombre no puede contener números'
+  if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s.'-]+$/.test(trimmed)) return 'El nombre solo puede contener letras y espacios'
+  return ''
+}
+
+const validateDni = (value = '') => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 8)
+  if (!digits) return 'El DNI es obligatorio'
+  if (!/^\d{8}$/.test(digits)) return 'El DNI debe tener 8 dígitos'
+  return ''
+}
+
+const validateTelefono = (value = '') => {
+  const digits = String(value || '').replace(/\D/g, '').slice(0, 9)
+  if (!digits) return 'El teléfono es obligatorio'
+  if (!/^\d{9}$/.test(digits)) return 'El teléfono debe tener 9 dígitos'
+  return ''
+}
+
+const validation = computed(() => ({
+  nombre: validateName(form.nombre),
+  dni: validateDni(form.dni),
+  telefono: validateTelefono(form.telefono),
+}))
+
 const isEdit = computed(() => Boolean(props.sale))
 const baseTickets = computed(() => Math.max(0, Math.floor(Number(form.monto || 0) / 100)))
 const totalTickets = computed(() => baseTickets.value + (form.productoEspecial ? 3 : 0))
-const canSubmit = computed(() => Boolean(form.nombre?.trim() && form.dni?.trim() && form.telefono?.trim() && Number(form.monto || 0) >= 100))
+const canSubmit = computed(() => {
+  const hasValidName = !validateName(form.nombre)
+  const hasValidDni = !validateDni(form.dni)
+  const hasValidTelefono = !validateTelefono(form.telefono)
+  const hasEnoughAmount = Number(form.monto || 0) >= 100
+
+  return hasValidName && hasValidDni && hasValidTelefono && hasEnoughAmount
+})
 
 function resetForm() {
   form.nombre = ''
@@ -93,8 +133,8 @@ watch(
   (sale) => {
     if (sale) {
       form.nombre = sale.nombre || ''
-      form.dni = sale.dni || ''
-      form.telefono = sale.telefono || ''
+      form.dni = String(sale.dni || '').replace(/\D/g, '').slice(0, 8)
+      form.telefono = String(sale.telefono || '').replace(/\D/g, '').slice(0, 9)
       form.monto = Number(sale.monto || 0)
       form.productoEspecial = Boolean(sale.productoEspecial)
       return
@@ -105,10 +145,24 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => form.dni,
+  (value) => {
+    form.dni = String(value || '').replace(/\D/g, '').slice(0, 8)
+  },
+)
+
+watch(
+  () => form.telefono,
+  (value) => {
+    form.telefono = String(value || '').replace(/\D/g, '').slice(0, 9)
+  },
+)
+
 function submitForm() {
   if (!canSubmit.value) return
 
-  const dni = form.dni.trim()
+  const dni = String(form.dni || '').trim()
   if (!/^\d{8}$/.test(dni)) return
 
   emit('submit', {
@@ -205,6 +259,17 @@ function submitForm() {
   border-color: #3b82f6;
 }
 
+.field-error {
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: -4px;
+}
+
+.field input:invalid {
+  border-color: #fca5a5;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;
@@ -264,6 +329,10 @@ function submitForm() {
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.15s ease, opacity 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .btn:hover:not(:disabled) {
@@ -273,6 +342,22 @@ function submitForm() {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-top-color: rgba(255, 255, 255, 1);
+  border-radius: 50%;
+  display: inline-block;
+  animation: ticket-spin 0.8s linear infinite;
+}
+
+@keyframes ticket-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn.primary {
