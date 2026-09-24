@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.agricola.app',
-  appName: 'Agricola',
+  appName: 'AgroGest',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
