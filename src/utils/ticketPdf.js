@@ -79,16 +79,16 @@ function drawTicket(pdf, ticket, y, config) {
   pdf.setFont('times', 'normal')
   pdf.setFontSize(7)
   pdf.text('HASH:', 4, hashY)
-  pdf.setFont('times', 'normal')
+  pdf.setFont('times', 'bold')
   pdf.setFontSize(7)
   pdf.text(ticket.hash || '', 12, hashY)
 
   pdf.setFont('times', 'normal')
   pdf.setFontSize(7)
-  pdf.text('Fecha:', 37, hashY)
-  pdf.setFont('times', 'normal')
+  pdf.text('Fecha de sorteo:', 31, hashY)
+  pdf.setFont('times', 'bold')
   pdf.setFontSize(6.8)
-  pdf.text(formatDate(ticket.createdAt), 47, hashY)
+  pdf.text('11/10/2026 12:30 pm', 48, hashY)
 
   const footerY = hashY + 6
 
