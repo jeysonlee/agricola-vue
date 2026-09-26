@@ -101,6 +101,32 @@ function drawTicket(pdf, ticket, y, config) {
   pdf.line(0, dividerY, widthMm, dividerY) // línea divisoria con ancho real del ticket
 }
 
+export function openPdfInBrowser(pdf, fileName = 'document.pdf') {
+  if (!pdf || typeof window === 'undefined') return null
+
+  const blob = pdf.output('blob')
+  if (!blob || !window.URL || typeof window.URL.createObjectURL !== 'function') {
+    return null
+  }
+
+  const blobUrl = window.URL.createObjectURL(blob)
+  const previewWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer')
+
+  if (previewWindow) {
+    previewWindow.focus()
+  } else {
+    window.open(blobUrl, '_blank')
+  }
+
+  window.setTimeout(() => {
+    if (window.URL && typeof window.URL.revokeObjectURL === 'function') {
+      window.URL.revokeObjectURL(blobUrl)
+    }
+  }, 60000)
+
+  return previewWindow
+}
+
 export function exportTicketsToPdf(tickets, fileName = 'tickets-promocionales.pdf', options = {}) {
   if (!Array.isArray(tickets) || tickets.length === 0) return Promise.resolve()
 
@@ -145,7 +171,7 @@ export function exportTicketsToPdf(tickets, fileName = 'tickets-promocionales.pd
           y += ticketHeightMm
         })
 
-        pdf.save(fileName)
+        openPdfInBrowser(pdf, fileName)
         resolve()
       } catch (error) {
         reject(error)
@@ -170,6 +196,7 @@ export const jsPdfKeys = {
   line: 'dibuja una línea divisoria',
   addImage: 'agrega logo o imagen',
   setDrawColor: 'cambia el color de líneas',
-  setTextColor: 'cambia el color del texto',
+  setTextColor: 'cambia el color de líneas',
   save: 'descarga el PDF final',
+  openPdfInBrowser: 'abre una vista previa del PDF en una pestaña antes de descargar',
 }
